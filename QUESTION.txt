@@ -1,0 +1,3 @@
+what's does the function do:
+- mksincit
+- mksinc_table
