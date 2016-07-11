@@ -136,6 +136,7 @@ subroutine advanceWavefieldQ(old,cur,new,vsq,s,dt)
   end do
   call boundCond(cur%dat,new%dat)
 end subroutine
+
 subroutine advanceWavefield(old,cur,new,vsq,s,dt)
   type(waveT) :: old,cur,new
   type(modelingT) :: s
@@ -151,6 +152,7 @@ subroutine advanceWavefield(old,cur,new,vsq,s,dt)
   !$OMP END PARALLEL DO
   call boundCond(cur%dat,new%dat)
 end subroutine
+
 subroutine boundCond(cur,new)
   real :: cur(:,:),new(:,:)
   
