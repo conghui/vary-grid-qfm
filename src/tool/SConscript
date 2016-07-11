@@ -1,0 +1,30 @@
+import os
+Import('*')
+
+bin_list = [
+("test", "main-test.cpp"),
+]
+
+modules = """
+logger.cpp
+          """.split()
+
+include_dir = [
+  '#' + dirs['rsf'],
+]
+
+depend_libpath = []
+depend_libs = ['rsf']
+
+# clone the environment from global env and make some modification of it
+myenv   = env.Clone(CPPPATH = include_dir)
+myenv.Append(LIBPATH = depend_libpath)
+myenv.Prepend(LIBS = depend_libs)
+
+objs = myenv.StaticObject(modules)
+
+# compile each binary
+for bin in bin_list:
+  bin_obj = myenv.StaticObject(bin[1])
+  bin_target = myenv.Program(target = bin[0], source = bin_obj + objs)
+  myenv.Install("#" + dirs['bin'], bin_target)
