@@ -1,0 +1,7 @@
+- In `data_mod.f90`, what's `floc` mean? How to initialize it in 3D implementation.
+- In `data_mod.f90`, 2D case when allocate dat, why only n1+10, not both n1,n2, how about in 3D
+- What's times.H?
+- How to change it to 3D in `make_time.f90`.
+- How to change `initTimes` in `box_mod.f90`.
+- How to set the values in `mksinc_table` in `box_mod.f90`
+- How to set the implementation of `mksinc_table` to 3D in `sinc_mod.f90`. Should it be a 3D table?
