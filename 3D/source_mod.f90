@@ -32,11 +32,13 @@ module source_mod
    !deallocate(source%w)
   !end subroutine
 
-  !subroutine setSourceLocation(source,loc)
-     !type(sourceT) :: source
-     !real :: loc
-     !source%x=loc
-  !end subroutine
+  subroutine setSourceLocation(source,loc)
+     type(sourceT) :: source
+     real :: loc(:)
+
+     source%x=loc(1)
+     source%y = loc(2)
+  end subroutine
 
 
   subroutine readSource(tag,src)
@@ -52,6 +54,8 @@ module source_mod
    ierr= sep_get_data_axis_par(tag,1,nt,ot,dt,tmpS)
 
    call from_param("src_z",src%z)
+   call from_param("src_y", src%y)
+
    src%dt=dt
 
    allocate(tmp(nt))

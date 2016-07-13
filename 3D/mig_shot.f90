@@ -18,7 +18,7 @@ contains
 
 
 real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
-  integer :: ishot
+  integer :: ishot(:)
   logical :: verb
   type(velT) :: vel,vuse
   type(dataT) :: dat
@@ -39,13 +39,13 @@ real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
   full%o2=vel%o2; full%d1=vel%d1; full%n1=vel%n1
   full%o3=vel%o3; full%d3=vel%d3; full%n3=vel%n3
   call start_timer_num(timerIS)
-  !call readShot(dat,ishot)
-  !call setSourceLocation(source,getShotLocation(dat,ishot))
-  !call from_param("qtest",qtest,.false.)
-  !call from_param("writeSection",writeSection,-1)
-  !call from_param("writeCheckpoint",writeCheckpoint,-1)
- !icount=0
-  !factor=calcShotBox(vel,dat,source,times,domain)
+  call readShot(dat,ishot)
+  call setSourceLocation(source,getShotLocation(dat,ishot))
+  call from_param("qtest",qtest,.false.)
+  call from_param("writeSection",writeSection,-1)
+  call from_param("writeCheckpoint",writeCheckpoint,-1)
+  icount=0
+  factor=calcShotBox(vel,dat,source,times,domain)
   !cur=>domain%hyper(1); old=>cur
   !if(writeCheckPoint>0) then
     !ierr= sep_put_data_axis_par("wfield",1,vel%n1,vel%o1,vel%d1,"Depth");

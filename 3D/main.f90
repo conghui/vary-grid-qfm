@@ -15,8 +15,8 @@ program RTM_FAST
   type(modelingT) :: full
   integer :: ishot,ii
   real :: factor,rnd
-  integer, allocatable :: shot(:)
-  logical, allocatable :: shotL(:)
+  integer, allocatable :: shot(:, :, :) ! first dimension store the real index
+  logical, allocatable :: shotL(:, :)
 
 
   call initpar()
@@ -32,26 +32,34 @@ program RTM_FAST
   call initTimes(times)
   call initBox(dat,source,vel,verb)
 
-  call  init_sinc_table(8,10000)
+  call init_sinc_table(8,10000)
   call stop_timer_num(timerInit)
 
 
-  allocate(shot(dat%n4),shotL(dat%n4))
+  allocate(shot(2, dat%n4, dat%n5), shotL(dat%n4, dat%n5))
   shotL=.false.
-  ishot=1
-  do while(ishot<=dat%n4)
-    call random_number(rnd)
-    ii=max(1,min(dat%n4,nint(rnd*dat%n4)+1))
-    if(.not. shotL(ii)) then
-      shot(ishot)=ii
-      ishot=ishot+1
-    end if
+
+  ! ASK: what's doing in 2D cases?
+  do while(iyshot<= dat%n5)
+    ixshot = 1
+    do while(ixshot<= dat%n4)
+      call random_number(rnd)
+      ii=max(1,min(dat%n4,nint(rnd*dat%n4)+1))
+      jj=max(1,min(dat%n5,nint(rnd*dat%n5)+1))
+      if(.not. shotL(ii, jj)) then
+        shot(:,ixshot, iyshot)=(/ii, jj/)
+        ixshot = ixshot + 1
+      end if
+    end do
+    iyshot = iyshot + 1
   end do
 
-  do ishot=1,dat%n4
-      factor= migrate_shot(shot(ishot),verb,vel,dat,source,times)
-      write(0,*) ishot," MIGRATING SHOT", shot(ishot), " of ",dat%n3, " sped up ",factor
+  do iyshot = 1, dat%n5
+    do ixshot = 1, dat%n4
+      factor= migrate_shot(shot(:, ixshot, iyshot),verb,vel,dat,source,times)
+      write(0,*) ixshot, " MIGRATING SHOT", shot(1, ixshot, iyshot), " of ",dat%n4, " sped up ",factor
       !if(mod(ishot,5)==0)  call writeFullImage("img")
+    end do
   end do
   !call print_timers()
   !call writeFullImage("img")

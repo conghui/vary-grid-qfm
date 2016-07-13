@@ -5,3 +5,4 @@
 - How to change `initTimes` in `box_mod.f90`.
 - How to set the values in `mksinc_table` in `box_mod.f90`
 - How to set the implementation of `mksinc_table` to 3D in `sinc_mod.f90`. Should it be a 3D table?
+- What'd `breakAxis` mean? how to change it?

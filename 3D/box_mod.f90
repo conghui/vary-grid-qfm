@@ -92,57 +92,57 @@ logical :: verbose
 
 end subroutine
 
-!real function calcShotBox(vel,dat,source,times,domain)
-  !type(velT) :: vel
-  !type(dataT) :: dat
-  !type(boxT)  :: domain
-  !type(timesT) :: times
-  !type(sourceT) :: source
-  !real :: dtuse,blockTime
-  !integer :: i3,i2,i1,ishot,i
-  !real, allocatable :: minT(:,:)
-  !real :: timeMin,timeMax
+real function calcShotBox(vel,dat,source,times,domain)
+  type(velT) :: vel
+  type(dataT) :: dat
+  type(boxT)  :: domain
+  type(timesT) :: times
+  type(sourceT) :: source
+  real :: dtuse,blockTime
+  integer :: i3,i2,i1,ishot,i
+  real, allocatable :: minT(:,:)
+  real :: timeMin,timeMax
 
-  !i3=(source%x-times%o3)/times%d3+1.5
-  !allocate(minT(times%n1,times%n2))
+  i3=(source%x-times%o3)/times%d3+1.5
+  allocate(minT(times%n1,times%n2))
 
-  !minT=times%vals(:,:,i3)
+  minT=times%vals(:,:,i3)
 
-  !do ishot=1,size(dat%floc,2)
-     !i3=min(max(nint((dat%floc(2,ishot)-times%o3)/times%d3+1.5),1),times%n3)
-     !!$OMP PARALLEL DO private (i1,i2)
-     !do i2=1,times%n2
-       !do i1=1,times%n1
-          !minT(i1,i2)=min(minT(i1,i2),times%vals(i1,i2,i3))
-       !end do
-    !end do
-  !end do
+  do ishot=1,size(dat%floc,2)
+     i3=min(max(nint((dat%floc(2,ishot)-times%o3)/times%d3+1.5),1),times%n3)
+     !$OMP PARALLEL DO private (i1,i2)
+     do i2=1,times%n2
+       do i1=1,times%n1
+          minT(i1,i2)=min(minT(i1,i2),times%vals(i1,i2,i3))
+       end do
+    end do
+  end do
 
-  !allocate(domain%hyper(timeBlocks))
-  !blockTime=dat%n1*dat%d1/timeBlocks
-  !domain%blockSize=blockTIme
-  !tot1cells=0
-  !tot2cells=0
-  !totImaging=0
+  allocate(domain%hyper(timeBlocks))
+  blockTime=dat%n1*dat%d1/timeBlocks
+  domain%blockSize=blockTIme
+  tot1cells=0
+  tot2cells=0
+  totImaging=0
 
-  !do i=1,size(domain%hyper)
-    !domain%hyper(i)%bnd=bound
-    !domain%hyper(i)%dt=domain%dt
-    !timemin=(i-1)*blockTime
-    !timemax=timemin+blockTime
-    !domain%hyper(i)%sincT=>sincT
-    !call createModeling(domain%hyper(i),source,dat,times,timemin,timeMax,&
-      !minT,vel,bound,error,errorFact,qfact,downfact)
+  do i=1,size(domain%hyper)
+    domain%hyper(i)%bnd=bound
+    domain%hyper(i)%dt=domain%dt
+    timemin=(i-1)*blockTime
+    timemax=timemin+blockTime
+    domain%hyper(i)%sincT=>sincT
+    call createModeling(domain%hyper(i),source,dat,times,timemin,timeMax,&
+      minT,vel,bound,error,errorFact,qfact,downfact)
 
-  !end do
+  end do
 
-  !calcShotBox=tot2cells/tot1cells
+  calcShotBox=tot2cells/tot1cells
 
 
-  !if(v) write(0,*) size(domain%hyper),"total speedup factor",tot2cells/tot1cells
-  !domain%totImaging=totImaging
+  if(v) write(0,*) size(domain%hyper),"total speedup factor",tot2cells/tot1cells
+  domain%totImaging=totImaging
 
-!end function
+end function
 
 
 real function calcGoodSampling(source,dat,dmax) result(dt)
@@ -160,130 +160,130 @@ end function
 
 
 
-!subroutine createModeling(mod,source,dat,times,timeMin,timeMax,minT,vel,bound,error,errorFact,qfact,downFact)
-  !type(modelingT) :: mod
-  !type(timesT) :: times
-  !type(sourceT) :: source
-  !type(dataT) :: dat
-  !real :: timeMin,timeMax
-  !real :: minT(:,:)
-  !type(velT) :: vel
-  !integer :: bound,error
-  !real :: errorFact,qFact,downFact
-  !real :: mymin(2),mymax(2)
-  !real :: cyclesKill,fkill
-  !integer :: i1,i2,i3,n(2)
-  !real :: dsamp,o(2),d(2)
-  !real :: basic(5)
-  !integer :: bsize
-  !integer :: bb(100),ee(100),cb(100),ce(100)
-  !integer :: nb(2)
-  !integer :: i
-  !real ::dtmax
+subroutine createModeling(mod,source,dat,times,timeMin,timeMax,minT,vel,bound,error,errorFact,qfact,downFact)
+  type(modelingT) :: mod
+  type(timesT) :: times
+  type(sourceT) :: source
+  type(dataT) :: dat
+  real :: timeMin,timeMax
+  real :: minT(:,:)
+  type(velT) :: vel
+  integer :: bound,error
+  real :: errorFact,qFact,downFact
+  real :: mymin(2),mymax(2)
+  real :: cyclesKill,fkill
+  integer :: i1,i2,i3,n(2)
+  real :: dsamp,o(2),d(2)
+  real :: basic(5)
+  integer :: bsize
+  integer :: bb(100),ee(100),cb(100),ce(100)
+  integer :: nb(2)
+  integer :: i
+  real ::dtmax
 
-  !real :: os(2),ds(2),bv(2),ev(2)
-  !integer :: ns(2)
-  !double precision :: fullsize,smallsize
-  !real ::ff
-
-
-
-  !ns=(/size(mint,1),size(mint,2)/)
-  !os=(/times%o1,times%o2/)
-  !ds=(/times%d1,times%d2/)
-  !call findExts(os,ds,ns,minT,timeMax,mymin,mymax)
-
-  !if(timeMin>.0001) then
-    !ff=1.-2.*3.14159265/qfact
-    !cyclesKill=log(downfact)/log(ff)
-    !fkill=cyclesKill/max(timeMin,.001)
-    !!I don't care about things downfact less than its original ampliute
-
-    !dsamp=max(dmax,vmin/min(maxF,fkill)/3.3/errorFact)
-  !! if(v) write(0,*) "killing frequencies greater than ",fkill," at ",timeMin,cyclesKill,dsamp
-  !else
-    !dsamp=dmax
-  !end if
-
-  !if(slow==1) dsamp=dmax
-  !fullsize=vel%n1+2*mod%bnd
-  !fullsize=fullsize*(vel%n2+mod%bnd*2)
-
-  !bv=(/vel%o1,vel%o2/)
-  !ev=bv+((/vel%n1,vel%n2/)-1)*(/vel%d1,vel%d2/)
-  !do i=1,2
-    !o(i)=max(bv(i),mymin(i)-dsamp*error)
-    !mymax(i)=min(mymax(i)+dsamp*error,ev(i))
-    !n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
-    !!    mymin(i)=bv(i)
-    !!    o(i)=bv(i)
-   !! mymax(i)=ev(i)
-   !! n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
-
-   !if(slow==1)then
-    !mymin(i)=bv(i)
-        !o(i)=bv(i)
-    !mymax(i)=ev(i)
-    !n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
-   !end if
-  !end do
-
-
-  !mod%o1=o(1)-dsamp*(mod%bnd)
-  !mod%o2=o(2)-dsamp*(mod%bnd)
-
-  !mod%d1=dsamp; mod%d2=dsamp;
-  !mod%n1=n(1)+2*(mod%bnd)
-  !mod%n2=n(2)+2*(mod%bnd)
-  !dtmax=.49*dsamp/vmax
-  !mod%dt=calcGoodSampling(source,dat,dtmax)
- !! mod%dt=.00025
- !if(slow==1) mod%dt=.3*dsamp/vmax
-  !mod%ntblock=(timeMax-timeMin)/mod%dt
-  !mod%dtextra=(timeMax-timeMin)-mod%dt*mod%ntblock
-
-   !if(slow==1) then
-   !!  mod%dt=mod%dt/2. !Not sure why blowing up right now
-    !end if
+  real :: os(2),ds(2),bv(2),ev(2)
+  integer :: ns(2)
+  double precision :: fullsize,smallsize
+  real ::ff
 
 
 
-  !basic=(/3.333333333,-.4761904762,.0793650794,-.0099206349,.0006349206/)
-  !basic=(/8./5.,-.2,8./315.,-1./560.,0./)
-  !!basic=(/1.,0.,0.,0.,0./)
-  !!basic=2.*basic/sum(basic)
+  ns=(/size(mint,1),size(mint,2)/)
+  os=(/times%o1,times%o2/)
+  ds=(/times%d1,times%d2/)
+  call findExts(os,ds,ns,minT,timeMax,mymin,mymax)
+
+  if(timeMin>.0001) then
+    ff=1.-2.*3.14159265/qfact
+    cyclesKill=log(downfact)/log(ff)
+    fkill=cyclesKill/max(timeMin,.001)
+    !I don't care about things downfact less than its original ampliute
+
+    dsamp=max(dmax,vmin/min(maxF,fkill)/3.3/errorFact)
+  ! if(v) write(0,*) "killing frequencies greater than ",fkill," at ",timeMin,cyclesKill,dsamp
+  else
+    dsamp=dmax
+  end if
+
+  if(slow==1) dsamp=dmax
+  fullsize=vel%n1+2*mod%bnd
+  fullsize=fullsize*(vel%n2+mod%bnd*2)
+
+  bv=(/vel%o1,vel%o2/)
+  ev=bv+((/vel%n1,vel%n2/)-1)*(/vel%d1,vel%d2/)
+  do i=1,2
+    o(i)=max(bv(i),mymin(i)-dsamp*error)
+    mymax(i)=min(mymax(i)+dsamp*error,ev(i))
+    n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
+    !    mymin(i)=bv(i)
+    !    o(i)=bv(i)
+   ! mymax(i)=ev(i)
+   ! n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
+
+   if(slow==1)then
+    mymin(i)=bv(i)
+        o(i)=bv(i)
+    mymax(i)=ev(i)
+    n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
+   end if
+  end do
+
+
+  mod%o1=o(1)-dsamp*(mod%bnd)
+  mod%o2=o(2)-dsamp*(mod%bnd)
+
+  mod%d1=dsamp; mod%d2=dsamp;
+  mod%n1=n(1)+2*(mod%bnd)
+  mod%n2=n(2)+2*(mod%bnd)
+  dtmax=.49*dsamp/vmax
+  mod%dt=calcGoodSampling(source,dat,dtmax)
+ ! mod%dt=.00025
+ if(slow==1) mod%dt=.3*dsamp/vmax
+  mod%ntblock=(timeMax-timeMin)/mod%dt
+  mod%dtextra=(timeMax-timeMin)-mod%dt*mod%ntblock
+
+   if(slow==1) then
+   !  mod%dt=mod%dt/2. !Not sure why blowing up right now
+    end if
 
 
 
-  !mod%d1a=basic!*mod%dt*mod%dt!
+  basic=(/3.333333333,-.4761904762,.0793650794,-.0099206349,.0006349206/)
+  basic=(/8./5.,-.2,8./315.,-1./560.,0./)
+  !basic=(/1.,0.,0.,0.,0./)
+  !basic=2.*basic/sum(basic)
 
 
-  !mod%d1a=mod%d1a/dsamp/dsamp
-  !mod%d2a=basic/dsamp/dsamp
 
-  !mod%d0=-2.*(sum(mod%d1a)+sum(mod%d2a))
-
-  !nb(1)=breakAxis(mod%n2,50,bb,ee,5)
+  mod%d1a=basic!*mod%dt*mod%dt!
 
 
-    !mod%nsect=nb(1)
-  !allocate(mod%b(2,mod%nsect),mod%e(2,mod%nsect))
-  !i=0
-    !do i1=1,nb(1)
-      !i=i+1
-      !mod%b(:,i)=(/6,bb(i1)/)
-      !mod%e(:,i)=(/mod%n1-5,ee(i1)/)
-    !end do
-  !smallsize=mod%n1*mod%n2
-  !mod%jimage=jimage
+  mod%d1a=mod%d1a/dsamp/dsamp
+  mod%d2a=basic/dsamp/dsamp
+
+  mod%d0=-2.*(sum(mod%d1a)+sum(mod%d2a))
+
+  nb(1)=breakAxis(mod%n2,50,bb,ee,5)
 
 
-  !tot1cells=tot1cells+smallsize*mod%ntblock
-  !tot2cells=tot2cells+fullsize*(timeMax-timeMin)/dtBig
-  !totImaging=totImaging+mod%ntblock/jImage
-!!  if(v) write(0,*) "new grid",mod%n1,mod%n2
- !if(v) write(0,*) "speedup factor",(fullsize*(timeMax-timeMin)/dtBig)/(smallsize*mod%ntblock),mod%dt
-!end subroutine
+    mod%nsect=nb(1)
+  allocate(mod%b(2,mod%nsect),mod%e(2,mod%nsect))
+  i=0
+    do i1=1,nb(1)
+      i=i+1
+      mod%b(:,i)=(/6,bb(i1)/)
+      mod%e(:,i)=(/mod%n1-5,ee(i1)/)
+    end do
+  smallsize=mod%n1*mod%n2
+  mod%jimage=jimage
+
+
+  tot1cells=tot1cells+smallsize*mod%ntblock
+  tot2cells=tot2cells+fullsize*(timeMax-timeMin)/dtBig
+  totImaging=totImaging+mod%ntblock/jImage
+!  if(v) write(0,*) "new grid",mod%n1,mod%n2
+ if(v) write(0,*) "speedup factor",(fullsize*(timeMax-timeMin)/dtBig)/(smallsize*mod%ntblock),mod%dt
+end subroutine
 
 !integer function breakAxis(n,nblock,b,e,edge)
   !integer :: n,b(100),e(100),edge,nblock,ns
