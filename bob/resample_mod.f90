@@ -34,15 +34,14 @@ contains
     newf=0;
 
     do i2=1,newS%n2
-    x2(i2)=(newS%o2+newS%d2*(i2-1.)-oldS%o2)/oldS%d2+1
-    if(x2(i2) > .999 .and. i2 < b2) b2=i2
-    if(x2(i2) < oldS%n2+.001 .and. i2 > e2) e2=i2
+      x2(i2)=(newS%o2+newS%d2*(i2-1.)-oldS%o2)/oldS%d2+1
+      if(x2(i2) > .999 .and. i2 < b2) b2=i2
+      if(x2(i2) < oldS%n2+.001 .and. i2 > e2) e2=i2
     end do
     do i1=1,news%n1
-    x1(i1)=(newS%o1+newS%d1*(i1-1.)-oldS%o1)/oldS%d1+1
-    if(x1(i1) > .999 .and. i1< b1) b1=i1
-    if(x1(i1) < oldS%n1+.001 .and. i1 > e1) e1=i1
-
+      x1(i1)=(newS%o1+newS%d1*(i1-1.)-oldS%o1)/oldS%d1+1
+      if(x1(i1) > .999 .and. i1< b1) b1=i1
+      if(x1(i1) < oldS%n1+.001 .and. i1 > e1) e1=i1
     end do
     allocate(k1(newS%n1),k2(newS%n2))
     !!write(0,*) "OLD 1",oldS%n1,oldS%o1,oldS%d1
@@ -110,8 +109,8 @@ contains
       !end where
 
       do i1=1,ns
-      c1(i1,:)=k1-4+i1
-      c2(i1,:)=k2-4+i1
+        c1(i1,:)=k1-4+i1
+        c2(i1,:)=k2-4+i1
       end do
       where(c1 <1)
         c1=1
@@ -130,17 +129,15 @@ contains
 
         !$OMP PARALLEL DO private(i1,i2,ib,ia)
         do i2=1,size(newF,2)
-        do i1=1,size(newF,1)
-
-        do ib=1,ns
-        do ia=1,ns
-
-        newF(i1,i2)=newF(i1,i2)+&
-          oldF(c1(ia,i1),c2(ib,i2))*&
-          sinc_table(ia,t1(i1))*sinc_table(ib,t2(i2))
-        end do
-        end do
-        end do
+          do i1=1,size(newF,1)
+            do ib=1,ns
+              do ia=1,ns
+                newF(i1,i2)=newF(i1,i2)+&
+                  oldF(c1(ia,i1),c2(ib,i2))*&
+                  sinc_table(ia,t1(i1))*sinc_table(ib,t2(i2))
+              end do
+            end do
+          end do
         end do
         !$OMP END PARALLEL DO
 
@@ -148,22 +145,19 @@ contains
       else
         !$OMP PARALLEL DO private(i1,i2,ib,ia)
         do i2=b2,e2
-        do i1=b1,e1
-
-        do ib=1,ns
-        if(c2(ib,i2) >0 .and. c2(ib,i2) <=oldS%n2) then
-          do ia=1,ns
-          if(c1(ia,i1) >0 .and. c1(ia,i1) <=oldS%n1) then
-            newF(i1,i2)=newF(i1,i2)+&
-              oldF(c1(ia,i1),c2(ib,i2))*&
-              sinc_table(ia,t1(i1))*sinc_table(ib,t2(i2))
-
-          end if
+          do i1=b1,e1
+            do ib=1,ns
+              if(c2(ib,i2) >0 .and. c2(ib,i2) <=oldS%n2) then
+                do ia=1,ns
+                  if(c1(ia,i1) >0 .and. c1(ia,i1) <=oldS%n1) then
+                    newF(i1,i2)=newF(i1,i2)+&
+                      oldF(c1(ia,i1),c2(ib,i2))*&
+                      sinc_table(ia,t1(i1))*sinc_table(ib,t2(i2))
+                  end if
+                end do
+              end if
+            end do
           end do
-        end if
-        end do
-
-        end do
         end do
         !$OMP END PARALLEL DO
       end if

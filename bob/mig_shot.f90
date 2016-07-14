@@ -55,7 +55,7 @@ contains
       ierr= sep_put_data_axis_par("wfield",3,domain%hyper(writeSection)%ntblock*4,0.,domain%hyper(writeSection)%dt,"time")
     end if
     allocate(vuse%dat(1,1),vuse%vgamma(1,1))
-    call setPropSize(vel,cur,vuse)
+    call setPropSize(vel,cur,vuse) !ASK: how to change in the 3D case?
     call resampleVel(vel,old,vuse)
 
     p1%dat=0; p2%dat=0; p3%dat=0
@@ -72,8 +72,6 @@ contains
         call resampleVel(vel,cur,vuse)
         call resampleP(p1,old,cur)
         call resampleP(p2,old,cur)
-        !    call resampleP(p3,old,cur)
-
         call resampleP(p3,old,cur)
 
         call stop_timer_num(timerR)
@@ -101,22 +99,22 @@ contains
     p1%dat=0; p2%dat=0; p3%dat=0
     call createIuse(cur,iuse)
     do iblock=size(domain%hyper),1,-1
-    write(0,*) "ADJOINT BLOCK",iblock
+      write(0,*) "ADJOINT BLOCK",iblock
 
-    cur=>domain%hyper(iblock)
-    if(.not. checkSame(cur,old)) then
-      call resampleVel(vel,cur,vuse)
-      call resampleP(p1,old,cur)
-      call resampleP(p2,old,cur)
-      call resampleP(p3,old,cur)
-      call resampleI(iuse,old,cur)
-      old=>cur
-    end if
+      cur=>domain%hyper(iblock)
+      if(.not. checkSame(cur,old)) then
+        call resampleVel(vel,cur,vuse)
+        call resampleP(p1,old,cur)
+        call resampleP(p2,old,cur)
+        call resampleP(p3,old,cur)
+        call resampleI(iuse,old,cur)
+        old=>cur
+      end if
 
-    t0=iblock*domain%blockSize
-    call backwardBlock(t0,iimage,cur,pold,pcur,pnew,vuse,dat,sou,iuse)
+      t0=iblock*domain%blockSize
+      call backwardBlock(t0,iimage,cur,pold,pcur,pnew,vuse,dat,sou,iuse)
 
-    ! call writeFull("wfield.H",cur,full,p3%dat,.false.)
+      ! call writeFull("wfield.H",cur,full,p3%dat,.false.)
 
     end do
     call updateImage(cur,iuse)

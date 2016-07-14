@@ -110,6 +110,7 @@ subroutine resampleP(fld,old,cur)
   deallocate(tmp)
 
 end subroutine
+
 subroutine setPropSize(vel,cur,vuse)
   type(modelingT) :: cur
   type(velT) :: vuse,vel
