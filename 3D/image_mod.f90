@@ -31,84 +31,82 @@ contains
 
   end subroutine
 
-  !subroutine cleanIuse(iuse)
-  !type(imageT) :: iuse
-  !deallocate(iuse%dat)
+  subroutine cleanIuse(iuse)
+    type(imageT) :: iuse
+    deallocate(iuse%dat)
+  end subroutine
 
-  !end subroutine
+  subroutine createIuse(cur,iuse)
+  type(modelingT) :: cur
+  type(imageT) :: iuse
 
+  iuse%n1=cur%n1; iuse%o1=cur%o1; iuse%d1=cur%d1
+  iuse%n2=cur%n2; iuse%o2=cur%o2; iuse%d2=cur%d2
+  iuse%n3=cur%n3; iuse%o3=cur%o3; iuse%d3=cur%d3
 
-  !subroutine createIuse(cur,iuse)
-  !type(modelingT) :: cur
-  !type(imageT) :: iuse
+  allocate(iuse%dat(iuse%n1,iuse%n2,iuse%n3))
+  iuse%dat=0
+  end subroutine
 
-  !iuse%n1=cur%n1; iuse%o1=cur%o1; iuse%d1=cur%d1
-  !iuse%n2=cur%n2; iuse%o2=cur%o2; iuse%d2=cur%d2
+  subroutine resampleI(iuse,old,cur)
+  type(modelingT) :: old,cur
+  type(imageT) :: iuse
+  real, allocatable :: tmp(:,:,:)
+  integer :: ierr
+  allocate(tmp(myd%n1,myd%n2,myd%n3))
+  call InterpField(old,myD,iuse%dat,tmp,.false.)
+  imageTot=imageTot+tmp/cur%ntblock
+  iuse%n1=cur%n1; iuse%o1=cur%o1; iuse%d1=cur%d1
+  iuse%n2=cur%n2; iuse%o2=cur%o2; iuse%d2=cur%d2
+  iuse%n3=cur%n3; iuse%o3=cur%o3; iuse%d3=cur%d3
+  deallocate(tmp)
+  deallocate(iuse%dat)
+  allocate(iuse%dat(cur%n1,cur%n2,cur%n3))
+  iuse%dat=0
+  end subroutine
 
+  subroutine updateImage(cur,iuse)
+    type(modelingT) :: cur
+    real, allocatable :: tmp(:,:,:)
+    type(imageT) :: iuse
+    integer :: ierr
+    allocate(tmp(myd%n1,myd%n2,myd%n3))
+    call InterpField(cur,myD,iuse%dat,tmp,.false.)
+    imageTot=imageTot+tmp/cur%ntblock
+    deallocate(tmp)
+  end subroutine
 
-  !allocate(iuse%dat(iuse%n1,iuse%n2))
-  !iuse%dat=0
-  !end subroutine
+  subroutine imageIt(pnew,rnew,iuse,cur)
+    integer ::   i1,i2,i3
+    type(imageT) :: iuse
+    real :: pnew(:,:,:),rnew(:,:,:)
+    type(modelingT) :: cur
 
-  !subroutine resampleI(iuse,old,cur)
-  !type(modelingT) :: old,cur
-  !type(imageT) :: iuse
-  !real, allocatable :: tmp(:,:)
-  !integer :: ierr
-  !allocate(tmp(myd%n1,myd%n2))
-  !call InterpField(old,myD,iuse%dat,tmp,.false.)
-  !imageTot=imageTot+tmp/cur%ntblock
-  !iuse%n1=cur%n1; iuse%o1=cur%o1; iuse%d1=cur%d1
-  !iuse%n2=cur%n2; iuse%o2=cur%o2; iuse%d2=cur%d2
-  !deallocate(tmp)
-  !deallocate(iuse%dat)
-  !allocate(iuse%dat(cur%n1,cur%n2))
-  !iuse%dat=0
-  !end subroutine
+    !$OMP PARAlLEL DO private(i1,i2,i3)
+    do i3=1,size(pnew,3)
+      do i2=1,size(pnew,2)
+        do i1=1,size(pnew,1)
+          iuse%dat(i1,i2,i3)=iuse%dat(i1,i2,i3)+pnew(i1,i2,i3)*&
+            rnew(i1,i2,i3)
+        end do
+      end do
+    end do
+    !$OMP END PARALLEL DO
+  end subroutine
 
-  !subroutine updateImage(cur,iuse)
-  !type(modelingT) :: cur
-  !real, allocatable :: tmp(:,:)
-  !type(imageT) :: iuse
-  !integer :: ierr
-  !allocate(tmp(myd%n1,myd%n2))
-  !call InterpField(cur,myD,iuse%dat,tmp,.false.)
-  !imageTot=imageTot+tmp/cur%ntblock
-  !deallocate(tmp)
+  subroutine writeImage(tag,cur,iuse)
+    type(modelingT) :: cur
+    real, allocatable :: tmp(:,:,:)
+    type(imageT) :: iuse
+    integer :: ierr
+    character(len=*) :: tag
 
-
-  !end subroutine
-
-  !subroutine imageIt(pnew,rnew,iuse,cur)
-  !integer ::   i1,i2,i3
-  !type(imageT) :: iuse
-  !real :: pnew(:,:),rnew(:,:)
-  !type(modelingT) :: cur
-
-
-  !!$OMP PARAlLEL DO private(i1,i2,i3)
-
-  !do i2=1,size(pnew,2)
-  !do i1=1,size(pnew,1)
-  !iuse%dat(i1,i2)=iuse%dat(i1,i2)+pnew(i1,i2)*&
-  !rnew(i1,i2)
-  !end do
-  !end do
-  !!$OMP END PARALLEL DO
-  !end subroutine
-
-  !subroutine writeImage(tag,cur,iuse)
-  !type(modelingT) :: cur
-  !real, allocatable :: tmp(:,:)
-  !type(imageT) :: iuse
-  !integer :: ierr
-  !character(len=*) :: tag
-  !allocate(tmp(myd%n1,myd%n2))
-  !call InterpField(cur,myD,iuse%dat,tmp,.false.)
-  !imageTot=imageTot+tmp
-  !ierr=srite(tag,imageTot,size(imageTot)*4)
-  !deallocate(tmp);
-  !end subroutine
+    allocate(tmp(myd%n1,myd%n2,myd%n3))
+    call InterpField(cur,myD,iuse%dat,tmp,.false.)
+    imageTot=imageTot+tmp
+    ierr=srite(tag,imageTot,size(imageTot)*4)
+    deallocate(tmp);
+  end subroutine
 
   !subroutine writeFullImage(tag)
   !integer :: ierr

@@ -99,25 +99,28 @@ contains
   !end subroutine
 
 
- !subroutine addReceiver(dat,tm,rnew,cur)
-   !type(dataT) :: dat
-   !integer :: it,ix,iy,iz,ibase,i2,isinc
-   !real :: rnew(:,:)
-   !type(modelingT) :: cur
-   !real,pointer :: sincT(:)
-   !real :: tm
+  subroutine addReceiver(dat,tm,rnew,cur)
+    type(dataT) :: dat
+    integer :: it,ix,iy,iz,ibase,i2,i3,isinc
+    real :: rnew(:,:,:)
+    type(modelingT) :: cur
+    real,pointer :: sincT(:)
+    real :: tm
 
+    it=tm/dat%d1
+    isinc=(tm-it*dat%d1)/dat%d1*10000+1
+    sincT=>cur%sincT(:,isinc)
+    ibase=it+4
 
-   !it=tm/dat%d1
-   !isinc=(tm-it*dat%d1)/dat%d1*10000+1
-   !sincT=>cur%sincT(:,isinc)
-   !ibase=it+4
-   !do i2=1,size(dat%dat,2)
-     !!for now nearest neighbor
-     !iz=(dat%floc(1,i2)-cur%o1)/cur%d1+1.5
-     !ix=(dat%floc(2,i2)-cur%o2)/cur%d2+1.5
-      !rnew(iz,ix)=rnew(iz,ix)+sum(dat%dat(ibase:ibase+7,i2)*sincT)/cur%d1/cur%d2
-   !end do
- !end subroutine
+    do i3=1,size(dat%dat,3)
+      do i2=1,size(dat%dat,2)
+        !for now nearest neighbor
+        iz=(dat%floc(1,i2,i3)-cur%o1)/cur%d1+1.5
+        ix=(dat%floc(2,i2,i3)-cur%o2)/cur%d2+1.5
+        iy=(dat%floc(3,i2,i3)-cur%o3)/cur%d3+1.5
+        rnew(iz,ix,iy)=rnew(iz,ix,iy)+sum(dat%dat(ibase:ibase+7,i2,i3)*sincT)/cur%d1/cur%d2/cur%d3
+      end do
+    end do
+  end subroutine
 
 end module

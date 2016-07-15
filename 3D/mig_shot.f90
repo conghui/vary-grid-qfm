@@ -92,46 +92,44 @@ real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
 
 
     call advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,xx,full)
- !!  call writeFull("wfield.H",cur,full,p3%dat,.false.)
-  !if(writeCheckPoint==iblock) then
-     !call writeFull("wfield",cur,full,pcur%dat,.false.)
-     !return
-  !end if
+    !  call writeFull("wfield.H",cur,full,p3%dat,.false.)
+    if(writeCheckPoint==iblock) then
+      call writeFull("wfield",cur,full,pcur%dat,.false.)
+      return
+    end if
   end do
 
+  iimage=iimage-1
+  p1%dat=0; p2%dat=0; p3%dat=0
+  call createIuse(cur,iuse)
+  do iblock=size(domain%hyper),1,-1
+      write(0,*) "ADJOINT BLOCK",iblock
 
+    cur=>domain%hyper(iblock)
+    if(.not. checkSame(cur,old)) then
+        call resampleVel(vel,cur,vuse)
+        call resampleP(p1,old,cur)
+        call resampleP(p2,old,cur)
+        call resampleP(p3,old,cur)
+        call resampleI(iuse,old,cur)
+        old=>cur
+     end if
 
-  !iimage=iimage-1
-  !p1%dat=0; p2%dat=0; p3%dat=0
-  !call createIuse(cur,iuse)
-  !do iblock=size(domain%hyper),1,-1
-      !write(0,*) "ADJOINT BLOCK",iblock
+     t0=iblock*domain%blockSize
+       call backwardBlock(t0,iimage,cur,pold,pcur,pnew,vuse,dat,sou,iuse)
 
-    !cur=>domain%hyper(iblock)
-    !if(.not. checkSame(cur,old)) then
-        !call resampleVel(vel,cur,vuse)
-        !call resampleP(p1,old,cur)
-        !call resampleP(p2,old,cur)
-        !call resampleP(p3,old,cur)
-        !call resampleI(iuse,old,cur)
-        !old=>cur
-     !end if
+    ! call writeFull("wfield.H",cur,full,p3%dat,.false.)
 
-     !t0=iblock*domain%blockSize
-       !call backwardBlock(t0,iimage,cur,pold,pcur,pnew,vuse,dat,sou,iuse)
+  end do
+  call updateImage(cur,iuse)
 
-    !! call writeFull("wfield.H",cur,full,p3%dat,.false.)
+ ! call print_timers()
+  call cleanIuse(iuse)
+  call cleanWavefields(p1,p2,p3)
+  call cleanSourceSave(sou)
+  call cleanBoxShot(domain)
 
-  !end do
-  !call updateImage(cur,iuse)
-
- !! call print_timers()
-  !call cleanIuse(iuse)
-  !call cleanWavefields(p1,p2,p3)
-  !call cleanSourceSave(sou)
-  !call cleanBoxShot(domain)
-
-  !call cleanVel(vuse)
+  call cleanVel(vuse)
 
 end function
 
@@ -156,7 +154,7 @@ subroutine advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,writeIt,ful
     if(mod(it,20)==0) write(0,*) "working on",it,cur%ntblock
     call start_timer_num(timerPA)
     if(slow==0 .or. qtest) then
-      !call advanceWavefieldQ(pold,pcur,pnew,vuse,cur,dt)
+      call advanceWavefieldQ(pold,pcur,pnew,vuse,cur,dt)
     else
       call advanceWavefield(pold,pcur,pnew,vuse,cur,dt)
     end if
@@ -200,59 +198,54 @@ subroutine advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,writeIt,ful
 end subroutine
 
 
-!subroutine backWardBlock(t0,iimage,cur,pold,pcur,pnew,vuse,dat,sou,iuse)
-  !type(modelingT) :: cur
-  !type(waveT), pointer :: pold,pcur,pnew,pt
-  !type(sourceW) :: sou
-  !type(dataT) :: dat
-  !type(velT) :: vuse
-  !type(imageT) :: iuse
-  !integer :: it,iimage
-  !logical :: done
-  !real :: dt,t0,tm
+subroutine backWardBlock(t0,iimage,cur,pold,pcur,pnew,vuse,dat,sou,iuse)
+  type(modelingT) :: cur
+  type(waveT), pointer :: pold,pcur,pnew,pt
+  type(sourceW) :: sou
+  type(dataT) :: dat
+  type(velT) :: vuse
+  type(imageT) :: iuse
+  integer :: it,iimage
+  logical :: done
+  real :: dt,t0,tm
 
-  !done=.false.
+  done=.false.
 
-
-
-  !tm=t0
-  !if(cur%dtExtra > cur%dt/100.) then
-    !dt=cur%dtExtra
-    !it=cur%ntblock+1
-  !else
-    !dt=cur%dt
-    !it=cur%ntblock
-  !end if
+  tm=t0
+  if(cur%dtExtra > cur%dt/100.) then
+    dt=cur%dtExtra
+    it=cur%ntblock+1
+  else
+    dt=cur%dt
+    it=cur%ntblock
+  end if
 
 
-  !do while(it >= 1)
-    !call start_timer_num(timerP)
-    !call advanceWavefield(pold,pcur,pnew,vuse,cur,dt)
-    !call stop_timer_num(timerP)
+  do while(it >= 1)
+    call start_timer_num(timerP)
+    call advanceWavefield(pold,pcur,pnew,vuse,cur,dt)
+    call stop_timer_num(timerP)
 
-    !call start_timer_num(timerI)
-    !call addReceiver(dat,tm,pnew%dat,cur)
-    !call stop_timer_num(timerI)
+    call start_timer_num(timerI)
+    call addReceiver(dat,tm,pnew%dat,cur)
+    call stop_timer_num(timerI)
 
-    !if(mod(it,cur%jimage)==0 .and. it <= cur%ntblock) then
+    if(mod(it,cur%jimage)==0 .and. it <= cur%ntblock) then
+      call start_timer_num(timerIm)
+      call imageIt(sou%w(iimage)%ar,pnew%dat,iuse,cur)
+      iimage=iimage-1
+      call stop_timer_num(timerIm)
+    end if
 
-      !call start_timer_num(timerIm)
-
-      !call imageIt(sou%w(iimage)%ar,pnew%dat,iuse,cur)
-
-      !iimage=iimage-1
-      !call stop_timer_num(timerIm)
-    !end if
-
-    !tm=tm-dt
-    !it=it-1
-    !dt=cur%dt
-    !pt=>pold
-    !pold=>pcur
-    !pcur=>pnew
-    !pnew=>pt
-  !end do
-!end subroutine
+    tm=tm-dt
+    it=it-1
+    dt=cur%dt
+    pt=>pold
+    pold=>pcur
+    pcur=>pnew
+    pnew=>pt
+  end do
+end subroutine
 
 
 end module
