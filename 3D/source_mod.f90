@@ -17,11 +17,11 @@ module source_mod
   contains
 
 
-  !subroutine  initSourceSave(source,nb)
-    !type(sourceW) :: source
-    !integer :: nb
-    !allocate(source%W(nb))
- !end subroutine
+  subroutine  initSourceSave(source,nb)
+    type(sourceW) :: source
+    integer :: nb
+    allocate(source%W(nb))
+ end subroutine
 
  !subroutine cleanSourceSave(source)
    !type(sourceW) :: source
@@ -69,28 +69,27 @@ module source_mod
  end subroutine
 
 
- !subroutine addSource(src,tm,rnew,cur,scale)
-   !type(sourceT) :: src
-   !real :: tm
-   !integer :: it,ix,iy,iz,ibase,isinc
-   !real :: rnew(:,:)
-   !real :: scale
-   !type(modelingT) :: cur
-   !real,pointer :: sincT(:)
-   !it=tm/src%dt
-   !isinc=(tm-it*src%dt)/src%dt*10000+1
-   !sincT=>cur%sincT(:,isinc)
-   !ibase=it+4
+ subroutine addSource(src,tm,rnew,cur,scale)
+   type(sourceT) :: src
+   real :: tm
+   integer :: it,ix,iy,iz,ibase,isinc
+   real :: rnew(:,:,:)
+   real :: scale
+   type(modelingT) :: cur
+   real,pointer :: sincT(:)
+   it=tm/src%dt
+   isinc=(tm-it*src%dt)/src%dt*10000+1
+   sincT=>cur%sincT(:,isinc)
+   ibase=it+4
 
+   if(ibase+7>size(src%dat)) return
 
-  !if(ibase+7>size(src%dat)) return
-     !!for now nearest neighbor
-     !iz=(src%z-cur%o1)/cur%d1+1.5
-     !ix=(src%x-cur%o2)/cur%d2+1.5
-          !rnew(iz,ix)=rnew(iz,ix)+scale*sum(src%dat(ibase:ibase+7)*sincT)/cur%d1/cur%d2
-
-
- !end subroutine
+   !for now nearest neighbor
+   iz=(src%z-cur%o1)/cur%d1+1.5
+   ix=(src%x-cur%o2)/cur%d2+1.5
+   iy=(src%y-cur%o3)/cur%d3+1.5
+   rnew(iz,ix,iy)=rnew(iz,ix,iy)+scale*sum(src%dat(ibase:ibase+7)*sincT)/cur%d1/cur%d2/cur%d3 ! ASK: I am not sure the correctness
+ end subroutine
 
 
 

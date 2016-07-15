@@ -66,11 +66,15 @@ contains
       !we just are resizing
       k1=x1+.5
       k2=x2+.5
+      k3=x3+.5
       where(x1<1)
         x1=1
       end where
       where(x2<1)
         x2=1
+      end where
+      where (x3 < 1)
+        x3 = 1
       end where
       where(x1>size(oldf,1))
         x1=size(oldf,1)
@@ -78,12 +82,16 @@ contains
       where(x2>size(oldf,2))
         x2=size(oldf,2)
       end where
+      where (x3 > size(oldF, 3))
+        x3 = size(oldF, 3)
+      end where
       newf=0
-      !$OMP PARALLEL DO private(i1,i2,ib,ia)
+      !$OMP PARALLEL DO private(i1,i2,i3)
+      do i3=1, size(newF, 3)
       do i2=1,size(newf,2)
       do i1=1,size(newf,1)
-
-      newf(i1,i2)=oldf(x1(i1),x2(i2))
+        newf(i1,i2,i3)=oldf(x1(i1),x2(i2),x3(i3))
+      end do
       end do
       end do
       !$OMP END PARALLEL DO
@@ -134,7 +142,7 @@ contains
       end where
 
       if(extend) then
-        !$OMP PARALLEL DO private(i1,i2,ib,ia)
+        !$OMP PARALLEL DO private(i1,i2,i3, ic, ib,ia)
         do i3=1,size(newF,3)
           do i2=1,size(newF,2)
             do i1=1,size(newF,1)
@@ -153,7 +161,7 @@ contains
         !$OMP END PARALLEL DO
 
       else
-        !$OMP PARALLEL DO private(i1,i2,ib,ia)
+        !$OMP PARALLEL DO private(i1,i2,i3, ic, ib,ia)
         do i3=b3,e3
           do i2=b2,e2
             do i1=b1,e1

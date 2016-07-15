@@ -53,40 +53,40 @@ end subroutine
   !deallocate(vel%vgamma,vel%dat)
 !end subroutine
 
-!subroutine resampleVel(vel,cur,vuse)
-  !type(velT) :: vel,vuse
-  !type(modelingT) :: cur
+subroutine resampleVel(vel,cur,vuse)
+  type(velT) :: vel,vuse
+  type(modelingT) :: cur
 
-  !deallocate(vuse%dat)
+  deallocate(vuse%dat)
 
- !! call setVelSize(vel,cur,vuse)
-  !deallocate(vuse%vgamma)
-  !allocate(vuse%dat(cur%n1,cur%n2))
-   !allocate(vuse%vgamma(cur%n1,cur%n2))
+  ! call setVelSize(vel,cur,vuse)
+  deallocate(vuse%vgamma)
+  allocate(vuse%dat(cur%n1,cur%n2,cur%n3))
+  allocate(vuse%vgamma(cur%n1,cur%n2,cur%n3))
 
-  !call interpField(initialS,cur,vel%dat,vuse%dat,.true.)
+  call interpField(initialS,cur,vel%dat,vuse%dat,.true.)
 
-!!  call addRandom(vuse%dat,cur%bnd)
-  !vuse%vgamma=-vuse%dat**(2*gamma-1)*w0**(2.*gamma)*sin(pi*gamma)/cur%dt
-  !vuse%dat=vuse%dat*vuse%dat
+  !  call addRandom(vuse%dat,cur%bnd)
+  vuse%vgamma=-vuse%dat**(2*gamma-1)*w0**(2.*gamma)*sin(pi*gamma)/cur%dt
+  vuse%dat=vuse%dat*vuse%dat
 
-!end subroutine
+end subroutine
 
-!subroutine writeFull(tag,cur,full,field,extend)
-  !character(len=*) :: tag
-  !type(modelingT) :: full,cur
-  !logical :: extend
-  !real :: field(:,:)
-  !real, allocatable :: ff(:,:)
-  !integer :: ierr
-  !allocate(ff(full%n1,full%n2))
+subroutine writeFull(tag,cur,full,field,extend)
+  character(len=*) :: tag
+  type(modelingT) :: full,cur
+  logical :: extend
+  real :: field(:,:,:)
+  real, allocatable :: ff(:,:,:)
+  integer :: ierr
+  allocate(ff(full%n1,full%n2,full%n3))
 
-  !call interpField(cur,full,field,ff,extend)
+  call interpField(cur,full,field,ff,extend)
 
-  !ierr=srite(tag,ff,size(ff)*4)
-  !deallocate(ff)
+  ierr=srite(tag,ff,size(ff)*4)
+  deallocate(ff)
 
-!end subroutine
+end subroutine
 
 !subroutine setVelSize(vel,cur,vuse)
   !type(modelingT) :: cur
