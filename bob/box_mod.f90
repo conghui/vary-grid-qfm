@@ -295,6 +295,7 @@ contains
 
 
 
+  ! conghui: find the minimum/maximum location
   subroutine findExts(o,d,n,minT,maxT,mymin,mymax)
     integer :: i1,i2,i3,n(2)
     real :: o(2),d(2),minT(:,:)

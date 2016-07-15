@@ -24,7 +24,6 @@ subroutine mksinc_table(nt,nsinc,table)
   do it=1,nt
     call mksincit(table(:,it),nsinc,t,space)
     t=(it-1)*dtab
-  ! table(:,it)=table(:,it)/sum(table(:,it))
   end do
 end subroutine
 
