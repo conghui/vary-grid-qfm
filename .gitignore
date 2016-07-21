@@ -2,5 +2,4 @@
 *.o
 *.mod
 .make.dependencies.LINUX
-*.H
 main.x
