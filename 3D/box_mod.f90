@@ -92,6 +92,7 @@ contains
     call from_param("slow",slow,0)
     dtBig=calcGoodSampling(source,dat,dstable)
 
+    write(0,*) 'vmin:',vmin,',    vmax:',vmax,',dmin:',dmin,',dmax:',dmax,',dstable:',dstable
   end subroutine
 
   real function calcShotBox(vel,dat,source,times,domain)
@@ -101,7 +102,7 @@ contains
     type(timesT) :: times
     type(sourceT) :: source
     real :: dtuse,blockTime
-    integer :: i4,i5,i3,i2,i1,iyshot,ixshot,i
+    integer :: i4,i5,i3,i2,i1,iyshot,ixshot,i, ierr
     real, allocatable :: minT(:,:,:)
     real :: timeMin,timeMax
 
@@ -110,12 +111,17 @@ contains
     i5 = (source%y - times%o5) / times%d5 + 1.5
     allocate(minT(times%n1,times%n2, times%n3))
 
+
+   write(0,*) "CHECK SOURCE",source%x,source%y
+   write(0,*) "SOURCE LOCATION IS ",i4,i5
     minT=times%vals(:,:,:,i4,i5)
 
+   !THIS SHould read in the receiver geomotry and loop over receiver locations
     do iyshot = 1, size(dat%floc, 3)
       do ixshot = 1, size(dat%floc, 2)
         i5=min(max(nint((dat%floc(3,ixshot,iyshot)-times%o5)/times%d5+1.5),1),times%n5)
         i4=min(max(nint((dat%floc(2,ixshot,iyshot)-times%o4)/times%d4+1.5),1),times%n4)
+      write(0,*) i4,ixshot,dat%floc(2,ixshot,iyshot),nint((dat%floc(2,ixshot,iyshot)-times%o4)/times%d4+1.5)
         !$OMP PARALLEL DO private (i1,i2,i3)
         do i3=1,times%n3
           do i2=1,times%n2
@@ -127,12 +133,20 @@ contains
       end do
     end do
 
+    ierr=sep_put_data_axis_par('minT.H', 1, times%n1, 0.0, 1.0, 'z')
+    ierr=sep_put_data_axis_par('minT.H', 2, times%n2, 0.0, 1.0, 'x')
+    ierr=sep_put_data_axis_par('minT.H', 3, times%n3, 0.0, 1.0, 'y')
+    ierr=srite('minT.H', minT, size(minT)*4)
+
     allocate(domain%hyper(timeBlocks))
     blockTime=dat%n1*dat%d1/timeBlocks
     domain%blockSize=blockTIme
     tot1cells=0
     tot2cells=0
     totImaging=0
+
+    write(0,*) __LINE__, 'timeBlocks', timeBlocks
+    write(0,*) __LINE__, 'blockTime', blockTime
 
     do i=1,size(domain%hyper)
       domain%hyper(i)%bnd=bound
@@ -150,6 +164,7 @@ contains
     if(v) write(0,*) size(domain%hyper),"total speedup factor",tot2cells/tot1cells
     domain%totImaging=totImaging
 
+    call exit()
   end function
 
 
@@ -180,8 +195,8 @@ contains
     real :: errorFact,qFact,downFact
     real :: mymin(3),mymax(3)
     real :: cyclesKill,fkill
-    integer :: i1,i2,i3,n(2)
-    real :: dsamp,o(2),d(2)
+    integer :: i1,i2,i3,n(3)
+    real :: dsamp,o(3),d(3)
     real :: basic(5)
     integer :: bsize
     integer :: bb(100),ee(100),cb(100),ce(100)
@@ -197,7 +212,16 @@ contains
     ns=(/size(mint,1),size(mint,2),size(minT,3)/)
     os=(/times%o1,times%o2,times%o3/)
     ds=(/times%d1,times%d2,times%d3/)
+
+    write(0,*) 'os', os(:)
+    write(0,*) 'ns', ns(:)
+    write(0,*) 'ds', ds(:)
+    write(0,*) __LINE__, 'timeMax', timeMax
+
     call findExts(os,ds,ns,minT,timeMax,mymin,mymax)
+
+    write(0,*) __LINE__, 'mymin:', mymin(:)
+    write(0,*) __LINE__, 'mymax:', mymax(:)
 
     if(timeMin>.0001) then
       ff=1.-2.*3.14159265/qfact
@@ -218,22 +242,31 @@ contains
 
     bv=(/vel%o1,vel%o2,vel%o3/)
     ev=bv+((/vel%n1,vel%n2,vel%n3/)-1)*(/vel%d1,vel%d2,vel%d3/)
-    do i=1,2,3
+
+    write(0,*) __LINE__, 'bv:', bv(:)
+    write(0,*) __LINE__, 'ev:', ev(:)
+    write(0,*) __LINE__, 'dsamp', dsamp
+    write(0,*) __LINE__, 'error', error
+
+    do i=1,3
       o(i)=max(bv(i),mymin(i)-dsamp*error)
       mymax(i)=min(mymax(i)+dsamp*error,ev(i))
       n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
-      !    mymin(i)=bv(i)
-      !    o(i)=bv(i)
-      ! mymax(i)=ev(i)
-      ! n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
+      write(0,*) __LINE__, 'n', n(i)
+      write(0,*) __LINE__, 'hello'
 
       if(slow==1)then
+        write(0,*) 'we set slow to 1'
         mymin(i)=bv(i)
         o(i)=bv(i)
         mymax(i)=ev(i)
         n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
       end if
     end do
+
+    write(0,*) __LINE__, 'o(:):', o(:)
+    write(0,*) __LINE__, 'mymax(:):', mymax(:)
+    write(0,*) __LINE__, 'n(:):', n(:), 'dsamp', dsamp
 
 
     mod%o1=o(1)-dsamp*(mod%bnd)
@@ -250,6 +283,11 @@ contains
     if(slow==1) mod%dt=.3*dsamp/vmax
     mod%ntblock=(timeMax-timeMin)/mod%dt
     mod%dtextra=(timeMax-timeMin)-mod%dt*mod%ntblock
+
+    write(0,*) 'mod%dt:', mod%dt
+    write(0,*) 'timeMax:', timeMax, ', timeMin:', timeMin
+    write(0,*) 'ntblock:', mod%ntblock
+    !call exit()
 
     if(slow==1) then
       !  mod%dt=mod%dt/2. !Not sure why blowing up right now
@@ -269,16 +307,29 @@ contains
 
     ! conghui: for debugging, set nblock to 1. Different from 2D, it breaks at
     ! the Y axis
-    nb(1)=breakAxis(mod%n3,1,bb,ee,5)
+    ! conghui: don't break axis, let openmp do it automatically
+    !nb(1)=breakAxis(mod%n3,40,bb,ee,5)
 
-    mod%nsect=nb(1)
+    if (1 == 3) then
+      mod%nsect=nb(1)
+      allocate(mod%b(3,mod%nsect),mod%e(3,mod%nsect))
+      i=0
+      do i1=1,nb(1)
+        i=i+1
+        mod%b(:,i)=(/6,6,bb(i1)/)
+        mod%e(:,i)=(/mod%n1-5,mod%n2-5,ee(i1)/)
+      end do
+    end if
+
+    mod%nsect = 1
     allocate(mod%b(3,mod%nsect),mod%e(3,mod%nsect))
-    i=0
-    do i1=1,nb(1)
-      i=i+1
-      mod%b(:,i)=(/6,6,bb(i1)/)
-      mod%e(:,i)=(/mod%n1-5,mod%n2-5,ee(i1)/)
-    end do
+    mod%b(:,1) = (/6, 6, 6/)
+    mod%e(:,1) = (/mod%n1-5, mod%n2-5, mod%n3-5/)
+
+    write(0,*) 'mod%b(:)', mod%b(:,1)
+    write(0,*) 'mod%e(:)', mod%e(:,1)
+    write(0,*) __LINE__, 'mod%n', mod%n1, mod%n2, mod%n3
+    !call exit()
     smallsize=mod%n1*mod%n2*mod%n3
     mod%jimage=jimage
 
@@ -288,6 +339,7 @@ contains
     totImaging=totImaging+mod%ntblock/jImage
     !  if(v) write(0,*) "new grid",mod%n1,mod%n2
     if(v) write(0,*) "speedup factor",(fullsize*(timeMax-timeMin)/dtBig)/(smallsize*mod%ntblock),mod%dt
+    !call exit()
   end subroutine
 
   ! conghui: don't break axis at the first stage, set nblock to zero
@@ -320,9 +372,14 @@ contains
     real :: mymin(3),mymax(3)
     mymin=o+d*n
     mymax=o
+    write(0,*) __LINE__, 'size(minT,1)', size(minT, 1)
     do i3=1,size(minT,3)
       do i2=1,size(minT,2)
         do i1=1,size(minT,1)
+            if (i1 == 49 .and. i2==1 .and. i3==1) then
+              write(0,*) __LINE__, 'minT(49,1,1):', minT(i1,i2,i3)
+              write(0,*) __LINE__, 'mymax:', mymax
+            end if
           if(minT(i1,i2,i3) <= maxT) then
             mymin(1)=min(mymin(1),o(1)+d(1)*(i1-1))
             mymax(1)=max(mymax(1),o(1)+d(1)*(i1-1))

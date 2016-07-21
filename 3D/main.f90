@@ -40,6 +40,7 @@ program RTM_FAST
   shotL=.false.
 
   ! ASK: what's doing in 2D cases?
+  iyshot=1
   do while(iyshot<= dat%n5)
     ixshot = 1
     do while(ixshot<= dat%n4)

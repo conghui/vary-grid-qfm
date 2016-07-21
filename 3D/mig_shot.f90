@@ -143,7 +143,6 @@ subroutine advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,writeIt,ful
   logical :: done,writeIt
   real :: dt,t0,tm
 
-
   done=.false.
   it=1
   dt=cur%dt
