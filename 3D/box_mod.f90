@@ -121,7 +121,7 @@ contains
       do ixshot = 1, size(dat%floc, 2)
         i5=min(max(nint((dat%floc(3,ixshot,iyshot)-times%o5)/times%d5+1.5),1),times%n5)
         i4=min(max(nint((dat%floc(2,ixshot,iyshot)-times%o4)/times%d4+1.5),1),times%n4)
-      write(0,*) i4,ixshot,dat%floc(2,ixshot,iyshot),nint((dat%floc(2,ixshot,iyshot)-times%o4)/times%d4+1.5)
+      !write(0,*) i4,ixshot,dat%floc(2,ixshot,iyshot),nint((dat%floc(2,ixshot,iyshot)-times%o4)/times%d4+1.5)
         !$OMP PARALLEL DO private (i1,i2,i3)
         do i3=1,times%n3
           do i2=1,times%n2
@@ -164,7 +164,7 @@ contains
     if(v) write(0,*) size(domain%hyper),"total speedup factor",tot2cells/tot1cells
     domain%totImaging=totImaging
 
-    call exit()
+    !call exit()
   end function
 
 
@@ -213,9 +213,9 @@ contains
     os=(/times%o1,times%o2,times%o3/)
     ds=(/times%d1,times%d2,times%d3/)
 
-    write(0,*) 'os', os(:)
-    write(0,*) 'ns', ns(:)
-    write(0,*) 'ds', ds(:)
+    write(0,*) __LINE__, 'os', os(:)
+    write(0,*) __LINE__, 'ns', ns(:)
+    write(0,*) __LINE__, 'ds', ds(:)
     write(0,*) __LINE__, 'timeMax', timeMax
 
     call findExts(os,ds,ns,minT,timeMax,mymin,mymax)
@@ -267,6 +267,7 @@ contains
     write(0,*) __LINE__, 'o(:):', o(:)
     write(0,*) __LINE__, 'mymax(:):', mymax(:)
     write(0,*) __LINE__, 'n(:):', n(:), 'dsamp', dsamp
+    write(0,*) __LINE__, 'mod%bnd', mod%bnd
 
 
     mod%o1=o(1)-dsamp*(mod%bnd)
@@ -278,15 +279,16 @@ contains
     mod%n2=n(2)+2*(mod%bnd)
     mod%n3=n(3)+2*(mod%bnd)
     dtmax=.49*dsamp/vmax
-    mod%dt=calcGoodSampling(source,dat,dtmax)
-    ! mod%dt=.00025
+    !mod%dt=calcGoodSampling(source,dat,dtmax)
+    !mod%dt=.00025
+    mod%dt=.004
     if(slow==1) mod%dt=.3*dsamp/vmax
     mod%ntblock=(timeMax-timeMin)/mod%dt
     mod%dtextra=(timeMax-timeMin)-mod%dt*mod%ntblock
 
-    write(0,*) 'mod%dt:', mod%dt
-    write(0,*) 'timeMax:', timeMax, ', timeMin:', timeMin
-    write(0,*) 'ntblock:', mod%ntblock
+    write(0,*) __LINE__, 'mod%dt:', mod%dt
+    write(0,*) __LINE__, 'timeMax:', timeMax, ', timeMin:', timeMin
+    write(0,*) __LINE__, 'ntblock:', mod%ntblock
     !call exit()
 
     if(slow==1) then
@@ -326,8 +328,8 @@ contains
     mod%b(:,1) = (/6, 6, 6/)
     mod%e(:,1) = (/mod%n1-5, mod%n2-5, mod%n3-5/)
 
-    write(0,*) 'mod%b(:)', mod%b(:,1)
-    write(0,*) 'mod%e(:)', mod%e(:,1)
+    write(0,*) __LINE__, 'mod%b(:)', mod%b(:,1)
+    write(0,*) __LINE__, 'mod%e(:)', mod%e(:,1)
     write(0,*) __LINE__, 'mod%n', mod%n1, mod%n2, mod%n3
     !call exit()
     smallsize=mod%n1*mod%n2*mod%n3
@@ -339,7 +341,6 @@ contains
     totImaging=totImaging+mod%ntblock/jImage
     !  if(v) write(0,*) "new grid",mod%n1,mod%n2
     if(v) write(0,*) "speedup factor",(fullsize*(timeMax-timeMin)/dtBig)/(smallsize*mod%ntblock),mod%dt
-    !call exit()
   end subroutine
 
   ! conghui: don't break axis at the first stage, set nblock to zero

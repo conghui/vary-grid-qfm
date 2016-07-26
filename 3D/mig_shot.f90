@@ -69,6 +69,7 @@ real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
   pold=>p1; pcur=>p2; pnew=>p3
   call stop_timer_num(timerIS)
 
+  write(0,*) 'writeSection', writeSection
   !FIRST RUN SOURCE FORWARD
   iimage=1
   do iblock=1,size(domain%hyper)
@@ -92,12 +93,15 @@ real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
 
 
     call advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,xx,full)
-    !  call writeFull("wfield.H",cur,full,p3%dat,.false.)
+      !call writeFull("wfield.H",cur,full,p3%dat,.false.)
     if(writeCheckPoint==iblock) then
       call writeFull("wfield",cur,full,pcur%dat,.false.)
       return
     end if
+    call exit()
   end do
+
+    call exit()
 
   iimage=iimage-1
   p1%dat=0; p2%dat=0; p3%dat=0
@@ -131,6 +135,7 @@ real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
 
   call cleanVel(vuse)
 
+  write(0,*) 'return migrate_shot'
 end function
 
 subroutine advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,writeIt,full)
@@ -183,7 +188,7 @@ subroutine advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,writeIt,ful
     end if
     if(writeIt .and. it<=cur%ntblock+1) then
       icount=icount+1
-      call writeFull("wfield",cur,full,pnew%dat,.false.)
+      if (mod(icount,20) == 0) call writeFull("wfield",cur,full,pnew%dat,.false.)
     end if
     tm=tm+dt
     pt=>pold

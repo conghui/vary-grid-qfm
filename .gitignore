@@ -3,3 +3,16 @@
 *.mod
 .make.dependencies.LINUX
 main.x
+junk.H
+make_time.x
+minT.H
+oneshot.H
+source.H
+times.H
+vel.3d.H
+vsmall.H
+x.H
+r.log
+single.H
+wfield
+wfield.H

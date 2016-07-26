@@ -39,6 +39,8 @@ program RTM_FAST
   allocate(shot(2, dat%n4, dat%n5), shotL(dat%n4, dat%n5))
   shotL=.false.
 
+  write(0,*) 'dat%n4',dat%n4, ' dat%n5', dat%n5
+
   ! ASK: what's doing in 2D cases?
   iyshot=1
   do while(iyshot<= dat%n5)
@@ -62,7 +64,7 @@ program RTM_FAST
       !if(mod(ishot,5)==0)  call writeFullImage("img")
     end do
   end do
-  !call print_timers()
-  !call writeFullImage("img")
+  call print_timers()
+  call writeFullImage("img")
 
 end program

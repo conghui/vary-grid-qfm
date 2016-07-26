@@ -108,15 +108,15 @@ contains
     deallocate(tmp);
   end subroutine
 
-  !subroutine writeFullImage(tag)
-  !integer :: ierr
-  !character(len=*) :: tag
-  !integer :: ng(2),nw(2),fw(2),jw(2)
-  !ng=(/size(imageTot,1),size(imageTot,2)/)
-  !nw=ng
-  !fw=0
-  !jw=1
-  !ierr=srite_window(tag,2,ng,nw,fw,jw,4,imageTot);
-  !end subroutine
+  subroutine writeFullImage(tag)
+  integer :: ierr
+  character(len=*) :: tag
+  integer :: ng(3),nw(3),fw(3),jw(3)
+  ng=(/size(imageTot,1),size(imageTot,2), size(imageTot, 3)/)
+  nw=ng
+  fw=0
+  jw=1
+  ierr=srite_window(tag,3,ng,nw,fw,jw,4,imageTot);
+  end subroutine
 end module
 
