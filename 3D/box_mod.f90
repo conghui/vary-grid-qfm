@@ -279,9 +279,9 @@ contains
     mod%n2=n(2)+2*(mod%bnd)
     mod%n3=n(3)+2*(mod%bnd)
     dtmax=.49*dsamp/vmax
-    mod%dt=calcGoodSampling(source,dat,dtmax)
+    !mod%dt=calcGoodSampling(source,dat,dtmax)
     !mod%dt=.00025
-    !mod%dt=.004
+    mod%dt=.004
     if(slow==1) mod%dt=.3*dsamp/vmax
     mod%ntblock=(timeMax-timeMin)/mod%dt
     mod%dtextra=(timeMax-timeMin)-mod%dt*mod%ntblock
