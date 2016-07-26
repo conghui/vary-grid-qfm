@@ -88,11 +88,11 @@ contains
       newf=0
       !$OMP PARALLEL DO private(i1,i2,i3)
       do i3=1, size(newF, 3)
-      do i2=1,size(newf,2)
-      do i1=1,size(newf,1)
-        newf(i1,i2,i3)=oldf(x1(i1),x2(i2),x3(i3))
-      end do
-      end do
+        do i2=1,size(newf,2)
+          do i1=1,size(newf,1)
+            newf(i1,i2,i3)=oldf(x1(i1),x2(i2),x3(i3))
+          end do
+        end do
       end do
       !$OMP END PARALLEL DO
 

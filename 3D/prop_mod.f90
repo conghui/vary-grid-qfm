@@ -111,6 +111,7 @@ subroutine propWaveQ(prev,cur,new,vsq,vgamma,d1a,d2a,d3a,d0,b,e)
   d21=d2a(1); d22=d2a(2); d23=d2a(3); d24=d2a(4); d25=d2a(5);
   d31=d3a(1); d32=d3a(2); d33=d3a(3); d34=d3a(4); d35=d3a(5);
 
+  !write(0,*) 'Q propagation'
   !write(0,*) 'b(3)', b(3), ', e(3)', e(3)
   do i3=b(3),e(3)
     do i2=b(2),e(2)
@@ -174,7 +175,7 @@ subroutine advanceWavefieldQ(old,cur,new,vsq,s,dt)
   real :: dt
 
   !write(0,*) 'in function advanceWavefieldQ, nsect', s%nsect
-  !$OMP PARALLEL DO private(isect)
+  !!$OMP PARALLEL DO private(isect)
   do isect=1,s%nsect
     call propwaveQ(old%dat,cur%dat,new%dat,vsq%dat,vsq%vgamma,s%d1a*dt*dt,s%d2a*dt*dt,s%d3a*dt*dt, &
      s%d0*dt*dt,s%b(:,isect),s%e(:,isect))
@@ -189,12 +190,12 @@ subroutine advanceWavefield(old,cur,new,vsq,s,dt)
   integer :: isect
   real :: dt
  ! write(0,*) "OOOH",s%d1a,dt
-  !$OMP PARALLEL DO private(isect)
+  !!$OMP PARALLEL DO private(isect)
   do isect=1,s%nsect
     call propwave(old%dat,cur%dat,new%dat,vsq%dat,s%d1a*dt*dt,s%d2a*dt*dt,s%d3a*dt*dt,&
      s%d0*dt*dt,s%b(:,isect),s%e(:,isect),s%b1,s%b2)
   end do
-  !$OMP END PARALLEL DO
+  !!$OMP END PARALLEL DO
   call boundCond(cur%dat,new%dat)
 end subroutine
 

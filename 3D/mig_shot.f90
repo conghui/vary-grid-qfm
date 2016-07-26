@@ -89,21 +89,22 @@ real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
 
 
     t0=(iblock-1)*domain%blockSize
-    xx=.false.
-    if(writeSection<=iblock .and. writeSection+3>=iblock .and. writeSection>0) xx=.true.
-    if(writesection>0 .and. iblock > writeSection+4) return
+    xx=.true.
+    !if(writeSection<=iblock .and. writeSection+3>=iblock .and. writeSection>0) xx=.true.
+    !if(writesection>0 .and. iblock > writeSection+4) return
 
 
     call advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,xx,full)
       !call writeFull("wfield.H",cur,full,p3%dat,.false.)
     if(writeCheckPoint==iblock) then
       call writeFull("wfield",cur,full,pcur%dat,.false.)
+      write(0,*) __LINE__, 'return writeCheckpoint == iblock'
       return
     end if
-    call exit()
+    !call exit()
   end do
 
-    call exit()
+  call seperr("return migrate_shot manually")
 
   iimage=iimage-1
   p1%dat=0; p2%dat=0; p3%dat=0
@@ -157,12 +158,12 @@ subroutine advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,writeIt,ful
 
   !cur%ntblock=cur%ntblock*3
   do while(.not. done)
-    !if(mod(it,20)==0) write(0,*) "working on",it,cur%ntblock
-    if(mod(it,1)==0) write(0,*) "working on",it,cur%ntblock
+    if(mod(it,20)==0) write(0,*) "working on",it,cur%ntblock
+    !if(mod(it,1)==0) write(0,*) "working on",it,cur%ntblock
     call start_timer_num(timerPA)
     if(slow==0 .or. qtest) then
-      !call advanceWavefieldQ(pold,pcur,pnew,vuse,cur,dt)
-      call advanceWavefield(pold,pcur,pnew,vuse,cur,dt)
+      call advanceWavefieldQ(pold,pcur,pnew,vuse,cur,dt)
+      !call advanceWavefield(pold,pcur,pnew,vuse,cur,dt)
     else
       call advanceWavefield(pold,pcur,pnew,vuse,cur,dt)
     end if
