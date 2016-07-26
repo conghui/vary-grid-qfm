@@ -296,7 +296,7 @@ contains
     end if
 
     basic=(/3.333333333,-.4761904762,.0793650794,-.0099206349,.0006349206/)
-    basic=(/8./5.,-.2,8./315.,-1./560.,0./)
+    !basic=(/8./5.,-.2,8./315.,-1./560.,0./)
     !basic=(/1.,0.,0.,0.,0./)
     !basic=2.*basic/sum(basic)
 
@@ -305,7 +305,7 @@ contains
     mod%d2a=basic/dsamp/dsamp
     mod%d3a=basic/dsamp/dsamp
 
-    mod%d0=-2.*(sum(mod%d1a)+sum(mod%d2a))
+    mod%d0=-2.*(sum(mod%d1a)+sum(mod%d2a)+sum(mod%d3a))
 
     ! conghui: for debugging, set nblock to 1. Different from 2D, it breaks at
     ! the Y axis

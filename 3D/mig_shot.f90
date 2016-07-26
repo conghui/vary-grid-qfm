@@ -9,7 +9,7 @@ module migrate_shot_mod
   use source_mod
   implicit none
   logical, private :: qtest
-  integer,private  :: writeSection,icount
+  integer,private  :: writeSection,icount, waveFieldWriteCnt
   integer, private :: writeCheckPoint
 
 
@@ -34,6 +34,8 @@ real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
   integer :: iblock,it,iimage,slow,ierr
   logical :: xx
   real :: t0
+
+  waveFieldWriteCnt = 0
 
   full%o1=vel%o1; full%d2=vel%d2 ;full%n2=vel%n2;
   full%o2=vel%o2; full%d1=vel%d1; full%n1=vel%n1
@@ -155,10 +157,12 @@ subroutine advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,writeIt,ful
 
   !cur%ntblock=cur%ntblock*3
   do while(.not. done)
-    if(mod(it,20)==0) write(0,*) "working on",it,cur%ntblock
+    !if(mod(it,20)==0) write(0,*) "working on",it,cur%ntblock
+    if(mod(it,1)==0) write(0,*) "working on",it,cur%ntblock
     call start_timer_num(timerPA)
     if(slow==0 .or. qtest) then
-      call advanceWavefieldQ(pold,pcur,pnew,vuse,cur,dt)
+      !call advanceWavefieldQ(pold,pcur,pnew,vuse,cur,dt)
+      call advanceWavefield(pold,pcur,pnew,vuse,cur,dt)
     else
       call advanceWavefield(pold,pcur,pnew,vuse,cur,dt)
     end if
@@ -188,7 +192,11 @@ subroutine advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,writeIt,ful
     end if
     if(writeIt .and. it<=cur%ntblock+1) then
       icount=icount+1
-      if (mod(icount,20) == 0) call writeFull("wfield",cur,full,pnew%dat,.false.)
+      if (mod(icount,20) == 0) then
+        waveFieldWriteCnt = waveFieldWriteCnt + 1
+        write(0,*) 'write wave field to file #', waveFieldWriteCnt
+        call writeFull("wfield",cur,full,pnew%dat,.false.)
+      end if
     end if
     tm=tm+dt
     pt=>pold

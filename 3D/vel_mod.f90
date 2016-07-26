@@ -19,7 +19,7 @@ contains
     type(velT) :: vel
     type(modelingT) :: full
     character(len=128) :: junk
-    integer :: ierr
+    integer :: ierr,i1,i2,i3
 
     ierr= sep_get_data_axis_par(fle,1,vel%n1,vel%o1,vel%d1,junk)
     ierr= sep_get_data_axis_par(fle,2,vel%n2,vel%o2,vel%d2,junk)
@@ -36,6 +36,17 @@ contains
     gamma=1./pi*atan(2*pi/qfact)
     allocate(vel%dat(vel%n1,vel%n2, vel%n3))
     ierr=sreed(fle,vel%dat,size(vel%dat)*4)
+
+    do i3=1,vel%n3
+      do i2=1,vel%n2
+        do i1=1,vel%n1
+          if (abs(vel%dat(i1,i2,i3) - 2000) > 0.0001) then
+            write(0,*) 'vel /= 2000'
+            call exit()
+          end if
+        end do
+      end do
+    end do
     !vel%dat=1500
 
     initialS%n1=vel%n1; initialS%o1=vel%o1; initialS%d1=vel%d1

@@ -36,13 +36,13 @@ subroutine propWave(prev,cur,new,vsq,d1a,d2a,d3a,d0,b,e,b1,e1)
   integer :: b(:),e(:),b1,e1
   real ::d11,d12,d13,d14,d15,d21,d22,d23,d24,d25,d31,d32,d33,d34,d35
   integer :: i1,i2,i3
-  real :: tau,taucur,tauprev
+  real :: tau,taucur,tauprev, tmp
 
   d11=d1a(1); d12=d1a(2); d13=d1a(3); d14=d1a(4); d15=d1a(5);
   d21=d2a(1); d22=d2a(2); d23=d2a(3); d24=d2a(4); d25=d2a(5);
   d31=d3a(1); d32=d3a(2); d33=d3a(3); d34=d3a(4); d35=d3a(5);
 
-  !  write(0,*) "CHECK D11",d11,d21
+    !write(0,*) "CHECK D11",d11,d21
   ! call seperr("")
   do i3=b(3),e(3)
     do i2=b(2),e(2)
@@ -65,9 +65,37 @@ subroutine propWave(prev,cur,new,vsq,d1a,d2a,d3a,d0,b,e,b1,e1)
           d35*((cur(i1,i2,i3-5)+cur(i1,i2,i3+5)))+&
           d0*( (cur(i1,i2,i3))))+&
           2*cur(i1,i2,i3)-prev(i1,i2,i3)
+
+        !tmp = new(i1,i2,i3)
+        !tmp = (&
+          !d11*((cur(i1-1,i2,i3)+cur(i1+1,i2,i3)))+&
+          !d12*((cur(i1-2,i2,i3)+cur(i1+2,i2,i3)))+&
+          !d13*((cur(i1-3,i2,i3)+cur(i1+3,i2,i3)))+&
+          !d14*((cur(i1-4,i2,i3)+cur(i1+4,i2,i3)))+&
+          !d15*((cur(i1-5,i2,i3)+cur(i1+5,i2,i3)))+&
+          !d21*((cur(i1,i2-1,i3)+cur(i1,i2+1,i3)))+&
+          !d22*((cur(i1,i2-2,i3)+cur(i1,i2+2,i3)))+&
+          !d23*((cur(i1,i2-3,i3)+cur(i1,i2+3,i3)))+&
+          !d24*((cur(i1,i2-4,i3)+cur(i1,i2+4,i3)))+&
+          !d25*((cur(i1,i2-5,i3)+cur(i1,i2+5,i3)))+&
+          !d31*((cur(i1,i2,i3-1)+cur(i1,i2,i3+1)))+&
+          !d32*((cur(i1,i2,i3-2)+cur(i1,i2,i3+2)))+&
+          !d33*((cur(i1,i2,i3-3)+cur(i1,i2,i3+3)))+&
+          !d34*((cur(i1,i2,i3-4)+cur(i1,i2,i3+4)))+&
+          !d35*((cur(i1,i2,i3-5)+cur(i1,i2,i3+5)))+&
+          !d0*( (cur(i1,i2,i3))))
+
+        !if (abs(tmp) > 0.001) then
+          !write(0,*) 'tmp', tmp
+          !call seperr("")
+        !end if
       end do
     end do
   end do
+
+  if (maxval(new) > 100) then
+    call seperr("wavefield > 100")
+  end if
 end subroutine
 
 subroutine propWaveQ(prev,cur,new,vsq,vgamma,d1a,d2a,d3a,d0,b,e)
