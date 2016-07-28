@@ -37,16 +37,16 @@ contains
     allocate(vel%dat(vel%n1,vel%n2, vel%n3))
     ierr=sreed(fle,vel%dat,size(vel%dat)*4)
 
-    do i3=1,vel%n3
-      do i2=1,vel%n2
-        do i1=1,vel%n1
-          if (abs(vel%dat(i1,i2,i3) - 2000) > 0.0001) then
-            write(0,*) 'vel /= 2000'
-            call exit()
-          end if
-        end do
-      end do
-    end do
+    !do i3=1,vel%n3
+      !do i2=1,vel%n2
+        !do i1=1,vel%n1
+          !if (abs(vel%dat(i1,i2,i3) - 2000) > 0.0001) then
+            !write(0,*) 'vel /= 2000'
+            !call exit()
+          !end if
+        !end do
+      !end do
+    !end do
     !vel%dat=1500
 
     initialS%n1=vel%n1; initialS%o1=vel%o1; initialS%d1=vel%d1

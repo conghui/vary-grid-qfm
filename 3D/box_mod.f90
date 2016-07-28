@@ -232,6 +232,7 @@ contains
       dsamp=max(dmax,vmin/min(maxF,fkill)/3.3/errorFact)
       ! if(v) write(0,*) "killing frequencies greater than ",fkill," at ",timeMin,cyclesKill,dsamp
     else
+      write(0,*) 'set dsamp to dmax'
       dsamp=dmax
     end if
 
@@ -253,7 +254,6 @@ contains
       mymax(i)=min(mymax(i)+dsamp*error,ev(i))
       n(i)=ceiling((mymax(i)-mymin(i))/dsamp)+1
       write(0,*) __LINE__, 'n', n(i)
-      write(0,*) __LINE__, 'hello'
 
       if(slow==1)then
         write(0,*) 'we set slow to 1'
@@ -285,6 +285,10 @@ contains
     if(slow==1) mod%dt=.3*dsamp/vmax
     mod%ntblock=(timeMax-timeMin)/mod%dt
     mod%dtextra=(timeMax-timeMin)-mod%dt*mod%ntblock
+
+    write(0,*) __LINE__, 'n', mod%n1, mod%n2, mod%n3
+    write(0,*) __LINE__, 'o', mod%o1, mod%o2, mod%o3
+    write(0,*) __LINE__, 'd', mod%d1, mod%d2, mod%d3
 
     write(0,*) __LINE__, 'mod%dt:', mod%dt
     write(0,*) __LINE__, 'timeMax:', timeMax, ', timeMin:', timeMin

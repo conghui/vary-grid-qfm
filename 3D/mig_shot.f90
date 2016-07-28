@@ -71,6 +71,7 @@ real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
   pold=>p1; pcur=>p2; pnew=>p3
   call stop_timer_num(timerIS)
 
+  call seperr("exit manuall")
   write(0,*) 'writeSection', writeSection
   !FIRST RUN SOURCE FORWARD
   iimage=1
@@ -197,6 +198,13 @@ subroutine advanceBlock(t0,iimage,cur,pold,pcur,pnew,vuse,source,sou,writeIt,ful
         waveFieldWriteCnt = waveFieldWriteCnt + 1
         write(0,*) 'write wave field to file #', waveFieldWriteCnt
         call writeFull("wfield",cur,full,pnew%dat,.false.)
+      end if
+
+      if (waveFieldWriteCnt == 25) then
+        ierr = sep_put_data_axis_par('25w.H', 1, cur%n1, cur%o1, cur%d1, "Z")
+        ierr = sep_put_data_axis_par('25w.H', 2, cur%n2, cur%o2, cur%d2, "Z")
+        ierr = sep_put_data_axis_par('25w.H', 3, cur%n3, cur%o3, cur%d3, "Z")
+        ierr= srite('25w.H',pcur%dat,size(pcur%dat)*4)
       end if
     end if
     tm=tm+dt
