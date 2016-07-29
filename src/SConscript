@@ -7,6 +7,8 @@ bin_list = [
 
 modules = """
 fdutil.c
+step-forward.c
+common.c
           """.split()
 
 include_dir = [

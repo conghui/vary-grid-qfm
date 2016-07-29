@@ -9,9 +9,9 @@ import math
 # ------------------------------------------------------------
 par = {
     'nt':800, 'ot':0, 'dt':0.002, 'lt':'t', 'ut':'s',
-    'nx':400, 'ox':0, 'dx':0.032,  'lx':'x', 'ux':'km',
-    'ny':400, 'oy':0, 'dy':0.032,  'ly':'y', 'uy':'km',
-    'nz':400, 'oz':0, 'dz':0.032,  'lz':'z', 'uz':'km',
+    'nx':400, 'ox':0, 'dx':0.02,  'lx':'x', 'ux':'km',
+    'ny':400, 'oy':0, 'dy':0.02,  'ly':'y', 'uy':'km',
+    'nz':200, 'oz':0, 'dz':0.01,  'lz':'z', 'uz':'km',
     'kt':80,
     'jsnap':100,
     'nb':10,
@@ -56,7 +56,7 @@ Flow('vel-3d',None,
 
 # 3D acoustic modeling
 Flow(['dd-3d', 'ww-3d'],['wav', 'vel-3d','ss-3d', 'rr-3d'],
-    '''../bin/test ompchunk=%(ompchunk)d ompnth=%(ompnth)d cden=y
+    '''awefd3d ompchunk=%(ompchunk)d ompnth=%(ompnth)d cden=y
             verb=y free=n snap=%(snap)s jsnap=%(jsnap)d jdata=%(jdata)d
             nb=%(nb)d dabc=%(dabc)s
             vel=${SOURCES[1]} sou=${SOURCES[2]} rec=${SOURCES[3]} wfl=${TARGETS[1]}
