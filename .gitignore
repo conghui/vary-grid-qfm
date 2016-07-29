@@ -16,3 +16,5 @@ r.log
 single.H
 wfield
 wfield.H
+bin/
+build/

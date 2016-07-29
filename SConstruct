@@ -10,13 +10,13 @@ import os
 
 # compiler options
 compiler_set        = 'gnu' # intel, gnu, sw, swintel
-debug_mode          = 1
-additional_includes = []
-additional_libpath  = []
-additional_libs     = []
+debug_mode          = 0
+additional_includes = [os.environ['RSFROOT'] + '/include']
+additional_libpath  = [os.environ['RSFROOT'] + '/lib']
+additional_libs     = ['rsf', 'su']
 
 if compiler_set == 'gnu':#{{{
-  c_compiler      = ['gcc',  '-fopenmp']
+  c_compiler      = ['gcc',  '-fopenmp', '-std=c99']
   cxx_compiler    = ['g++', '-fopenmp']
   linker          = cxx_compiler
   warn_flags      = ['-Wall', '-Wextra', '-Wno-write-strings']
@@ -30,8 +30,7 @@ if compiler_set == 'gnu':#{{{
 dirlist = [
    ('lib', 'lib'),
    ('bin', 'bin'),
-   ('tool', 'src/tool'),
-   ('rsf', 'src/rsf'),
+   ('src', 'src'),
 ]
 dirs = dict(dirlist)
 #}}}
@@ -47,7 +46,13 @@ else:
 # set includes and libs#{{{
 inc_path          = []
 libpath           = ['#lib']
-libs              = []
+libs = []
+for inc in additional_includes:
+  inc_path += ['-isystem', inc]
+for l in additional_libpath:
+  libpath += [l]
+for lp in additional_libs:
+  libs += [lp]
 #}}}
 # setup environment#{{{
 env = Environment(CC      = c_compiler,
@@ -60,7 +65,7 @@ env = Environment(CC      = c_compiler,
 #}}}
 # compile#{{{
 for d in dirlist:
-  if not 'src/' in d[1]:
+  if not 'src' in d[1]:
     continue
 
   SConscript(d[1] + '/SConscript',

@@ -71,7 +71,6 @@ real function migrate_shot(ishot,verb,vel,dat,source,times) result(factor)
   pold=>p1; pcur=>p2; pnew=>p3
   call stop_timer_num(timerIS)
 
-  call seperr("exit manuall")
   write(0,*) 'writeSection', writeSection
   !FIRST RUN SOURCE FORWARD
   iimage=1

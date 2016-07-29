@@ -2,19 +2,18 @@ import os
 Import('*')
 
 bin_list = [
-("test", "main-test.cpp"),
+("test", "main-test.c"),
 ]
 
 modules = """
-logger.cpp
+fdutil.c
           """.split()
 
 include_dir = [
-  '#' + dirs['rsf'],
 ]
 
 depend_libpath = []
-depend_libs = ['rsf']
+depend_libs = []
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)
