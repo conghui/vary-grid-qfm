@@ -10,7 +10,7 @@ import os
 
 # compiler options
 compiler_set        = 'gnu' # intel, gnu, sw, swintel
-debug_mode          = 0
+debug_mode          = 1
 additional_includes = [os.environ['RSFROOT'] + '/include']
 additional_libpath  = [os.environ['RSFROOT'] + '/lib']
 additional_libs     = ['rsf', 'su']

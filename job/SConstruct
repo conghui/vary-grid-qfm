@@ -18,24 +18,23 @@ par = {
     'frq':20
     }
 fdmod.param(par)
-par['jrr']=1
 
 # ------------------------------------------------------------
 # source/receiver coordinates
 # ------------------------------------------------------------
-par['ixsou']=par['nx']/2
-par['iysou']=par['ny']/2
-
-par['xsou']=par['ox']+par['ixsou']*par['dx']
-par['ysou']=par['oy']+par['iysou']*par['dy']
+par['xsou']=2.5
+par['ysou']=1.9
 par['zsou']=par['oz']
 fdmod.point3d('ss-3d',par['xsou'],par['ysou'],par['zsou'],par)
 
-fdmod.horizontal3d('tt-3d',par['oz'],par)
-Flow('rr-3d','tt-3d','put n2=%(nx)d n3=%(ny)d |'%par
-     +'window j2=%d j3=%d | put n2=%d n3=1'
-     %(par['jrr'],par['jrr'],par['nx']/par['jrr']*par['ny']/par['jrr']))
-
+Flow('tt_', None, 'math n1=70 o1=0.1 d1=0.05 n2=1 o2=0 d2=0.025 output=0')
+Flow('tt_z', 'tt_', 'math output=0')
+Flow('tt_x', 'tt_', 'math output=x1')
+Flow('tt_y', 'tt_', 'math output=0')
+Flow('rr-3d', ['tt_x', 'tt_y', 'tt_z'], '''
+    cat axis=3 space=n ${SOURCES[1]} ${SOURCES[2]} |
+    transp plane=12 | transp plane=13 |
+    put o1= o2= o3= d1= d2= d3= label1="(x,y,z)" label2="count" n2=%d n3=1''' % (70*1))
 
 # ------------------------------------------------------------
 # wavelet

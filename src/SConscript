@@ -9,6 +9,7 @@ modules = """
 fdutil.c
 step-forward.c
 common.c
+box.c
           """.split()
 
 include_dir = [

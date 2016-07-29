@@ -2,6 +2,7 @@
 #include "fdutil.h"
 #include "common.h"
 #include "step-forward.h"
+#include "box.h"
 
 int main(int argc, char** argv)
 {
@@ -111,6 +112,7 @@ int main(int argc, char** argv)
     }
   }
 
+  sf_warning("line: %d", __LINE__);
   at = sf_iaxa(file_wav,2); sf_setlabel(at,"t"); if(verb) sf_raxa(at); /* time */
   az = sf_iaxa(file_vel,1); sf_setlabel(az,"z"); if(verb) sf_raxa(az); /* depth */
   ax = sf_iaxa(file_vel,2); sf_setlabel(ax,"x"); if(verb) sf_raxa(ax); /* space */
@@ -141,6 +143,8 @@ int main(int argc, char** argv)
   sf_setn(at,(nt-1)/jdata+1);
   sf_setd(at,dt*jdata);
   sf_oaxa(file_dat,at,2);
+
+  sf_warning("line: %d", __LINE__);
 
   /* wavefield cut params */
   /* setup output wavefield header */
@@ -205,7 +209,10 @@ int main(int argc, char** argv)
   if (sinc) cssinc = sinc3d_make(ns,src3d,fdm);
   else      cslint = lint3d_make(ns,src3d,fdm);
 
+  sf_warning("read receiver locations");
+  sf_warning("nr: %d", nr);
   pt3dread1(file_rec,rec3d,nr,3);  /* read format: (x,y,z) */
+  sf_warning("end reading receiver");
   if (sinc) crsinc = sinc3d_make(nr,rec3d,fdm);
   else      crlint = lint3d_make(nr,rec3d,fdm);
 
@@ -249,6 +256,13 @@ int main(int argc, char** argv)
       for (ix=0; ix<nxpad; ix++)
         memset(vel[iy][ix],0,sizeof(float)*(fdm->nb+1));
   }
+
+  /////////////////////// add code here //////////////////
+  sf_warning("begin conghui's code");
+  /*times_t *times = read_times();*/
+
+  sf_warning("program exit before loop");
+  exit(0);
 
   for (it=0; it<nt; it++) {
     if (verb)  sf_warning("it=%d;",it+1);
@@ -339,6 +353,5 @@ int main(int argc, char** argv)
 
   return 0;
 }
-
 
 
