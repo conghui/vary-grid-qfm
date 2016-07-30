@@ -35,7 +35,7 @@ oneshot.H: elf.shots.H
 single.H: main.x vel.3d.H oneshot.H source.H times.H
 	./main.x source=source.H data=oneshot.H vel=vel.3d.H img=$@  src_x=5750 src_z=0 src_y=10 verbose=1 >junk.H qfact=200 times=times.H writeSection=1 timeBlocks=20
 	#./main.x source=source.H data=oneshot.H vel=0.H vel2=1.H img=$@  src_x=5750 src_z=0 src_y=10 verbose=1 >junk.H qfact=200 times=times.H writeSection=1 timeBlocks=20
-	#rm -f single.H
+	rm -f single.H
 
 
 clean: jclean

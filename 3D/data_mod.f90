@@ -75,8 +75,10 @@ contains
 
     do i3 = 1, dat%n3
       do i2 = 1, dat%n2
-        x=dat%o2+dat%d2*(i2-1)+dat%o4+dat%d4*(ixshot)
-        y=dat%o3+dat%d3*(i3-1)+dat%o5+dat%d5*(iyshot)
+        !x=dat%o2+dat%d2*(i2-1)+dat%o4+dat%d4*(ixshot)
+        !y=dat%o3+dat%d3*(i3-1)+dat%o5+dat%d5*(iyshot)
+        x=dat%o2+dat%d2*(i2-1)
+        y=dat%o3+dat%d3*(i3-1)
         dat%floc(:,i2,i3)=(/dat%depth,x,y/)
       end do
     end do

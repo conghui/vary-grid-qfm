@@ -4,13 +4,30 @@
 #include "step-forward.h"
 #include "box.h"
 
+static void vmin_vmax_dmin_dmax(float ***vel, sf_axis az, sf_axis ax, sf_axis ay, float *vmin, float *vmax, float *dmin, float *dmax) 
+{
+  *vmin = *dmin = 99999999;
+  *vmax = *dmax = 0;
+
+  for (int i3 = 0; i3 < sf_n(ay); i3++) {
+    for (int i2 = 0; i2 < sf_n(ax); i2++) {
+      for (int i1 = 0; i1 < sf_n(az); i1++) {
+        *vmin = fminf(*vmin, vel[i3][i2][i1]);
+        *vmax = fmaxf(*vmax, vel[i3][i2][i1]);
+      }
+    }
+  }
+
+  *dmin = fminf(fminf(sf_d(az), sf_d(ax)), sf_d(ay));
+  *dmax = fmaxf(fmaxf(sf_d(az), sf_d(ax)), sf_d(ay));
+}
+
 int main(int argc, char** argv)
 {
 
   bool verb, fsrf, snap, expl, dabc, cden, adj;
   bool optfd, hybrid, sinc;
   int jsnap, jdata;
-  float w0, qfact;
 
   /* I/O files */
   sf_file file_wav=NULL; /* wavelet */
@@ -92,8 +109,6 @@ int main(int argc, char** argv)
   if (!sf_getint("fdorder",&fdorder))  fdorder=4; /* spatial FD order */
   if (!sf_getbool("hybridbc",&hybrid))  hybrid=false;  /* hybrid Absorbing BC */
   if (!sf_getbool("sinc",&sinc)) sinc=false; /* sinc source injection */
-  if (!sf_getfloat("w0", &w0)) w0 = 60; // copy from vel_mod.f90
-  if (!sf_getfloat("qfact", &qfact)) qfact = 50; // copy from vel_mod.f90
 
   /* Initialize variables */
   file_wav = sf_input("in"); /* wavelet */
@@ -216,6 +231,10 @@ int main(int argc, char** argv)
   if (sinc) crsinc = sinc3d_make(nr,rec3d,fdm);
   else      crlint = lint3d_make(nr,rec3d,fdm);
 
+  /*for (int i = 0; i < nr; i++) {*/
+    /*sf_warning("rx: %f", rec3d[i].x);*/
+  /*}*/
+
   /* temperary array */
   tmp_array = sf_floatalloc3(nz,nx,ny);
 
@@ -259,8 +278,32 @@ int main(int argc, char** argv)
 
   /////////////////////// add code here //////////////////
   sf_warning("begin conghui's code");
-  /*times_t *times = read_times();*/
+  int   timeblocks;
+  float vmin;
+  float vmax;
+  float dmin;
+  float dmax;
+  float maxf; // maximum frequency
+  int   nb; // boundary
+  int   error;
+  float errorfact;
+  float qfact;
+  float downfact;
 
+  if (!sf_getint("timeblocks", &timeblocks)) timeblocks = 40;
+  if (!sf_getfloat("maxf", &maxf)) maxf = 80;
+  if (!sf_getint("error", &error)) error = 20;
+  if (!sf_getfloat("errorfact", &errorfact)) errorfact = 1.2;
+  if (!sf_getfloat("downfact", &downfact)) downfact = 0.04;
+  if (!sf_getfloat("qfact", &qfact)) qfact = 50; // copy from vel_mod.f90
+
+  nb = nbd;
+  vmin_vmax_dmin_dmax(vel, az, ax, ay, &vmin, &vmax, &dmin, &dmax);
+
+  times_t *times = read_times();
+  init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact);
+
+  calc_shot_box(times, src3d, rec3d, nr, nt, dt);
   sf_warning("program exit before loop");
   exit(0);
 

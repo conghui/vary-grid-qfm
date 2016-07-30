@@ -1,6 +1,8 @@
 #ifndef BOX_H_MLWKBDTF
 #define BOX_H_MLWKBDTF
 
+#include <rsf.h>
+
 typedef struct {
   int n1, n2, n3, n4, n5;
   float d1, d2, d3, d4, d5;
@@ -9,6 +11,26 @@ typedef struct {
   float *****val;
 } times_t;
 
+typedef struct {
+  int n1, n2, n3;
+  float o1, o2, o3;
+  float d1, d2, d3;
+  int nb;
+  float dt, dtextra;
+  int ntblock;
+} modeling_t;
+
+typedef struct  {
+  int nt;
+  int totImaging;
+  float dt;
+  float blockSize;  // propagation time in each block
+  modeling_t *hyper;
+} box_t;
+
 times_t *read_times();
 
+void calc_shot_box(const times_t *times, const pt3d *src3d, const pt3d *rec3d, int nr, int nt, float dt);
+
+void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, float maxf, int   nb, int   error, float errorfact, float qfact, float downfact);
 #endif /* end of include guard: BOX_H_MLWKBDTF */

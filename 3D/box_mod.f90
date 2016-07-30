@@ -76,8 +76,8 @@ contains
     call from_param("timeBlocks",timeBlocks,40);
     vmin=minval(vel%dat)
     vmax=maxval(vel%dat)
-    dmin=min(vel%d1,vel%d2)
-    dmax=max(vel%d1,vel%d2)
+    dmin=min(min(vel%d1,vel%d2), vel%d3)
+    dmax=max(max(vel%d1,vel%d2), vel%d3)
     dstable=.499*dmin/vmax !maximum sampling in time for stability
 
     allocate(sincT(8,10000)) ! ASK: how to set these values in 3D
@@ -111,9 +111,11 @@ contains
     i5 = (source%y - times%o5) / times%d5 + 1.5
     allocate(minT(times%n1,times%n2, times%n3))
 
-
+   write(0,*) 'times%o4, times%o5', times%o4, times%o5
+   write(0,*) 'times%d4, times%d5', times%d4, times%d5
    write(0,*) "CHECK SOURCE",source%x,source%y
    write(0,*) "SOURCE LOCATION IS ",i4,i5
+
     minT=times%vals(:,:,:,i4,i5)
 
    !THIS SHould read in the receiver geomotry and loop over receiver locations
@@ -122,6 +124,8 @@ contains
         i5=min(max(nint((dat%floc(3,ixshot,iyshot)-times%o5)/times%d5+1.5),1),times%n5)
         i4=min(max(nint((dat%floc(2,ixshot,iyshot)-times%o4)/times%d4+1.5),1),times%n4)
       !write(0,*) i4,ixshot,dat%floc(2,ixshot,iyshot),nint((dat%floc(2,ixshot,iyshot)-times%o4)/times%d4+1.5)
+        !write(0,*) 'i4, i5', i4, i5
+        !write(0,*) 'floc_y', dat%floc(3,ixshot,iyshot)
         !$OMP PARALLEL DO private (i1,i2,i3)
         do i3=1,times%n3
           do i2=1,times%n2
@@ -132,6 +136,7 @@ contains
         end do
       end do
     end do
+
 
     ierr=sep_put_data_axis_par('minT.H', 1, times%n1, 0.0, 1.0, 'z')
     ierr=sep_put_data_axis_par('minT.H', 2, times%n2, 0.0, 1.0, 'x')
@@ -164,7 +169,7 @@ contains
     if(v) write(0,*) size(domain%hyper),"total speedup factor",tot2cells/tot1cells
     domain%totImaging=totImaging
 
-    !call exit()
+    call exit()
   end function
 
 
@@ -224,6 +229,7 @@ contains
     write(0,*) __LINE__, 'mymax:', mymax(:)
 
     if(timeMin>.0001) then
+      write(0,*) 'compute __dsamp'
       ff=1.-2.*3.14159265/qfact
       cyclesKill=log(downfact)/log(ff)
       fkill=cyclesKill/max(timeMin,.001)
@@ -232,9 +238,11 @@ contains
       dsamp=max(dmax,vmin/min(maxF,fkill)/3.3/errorFact)
       ! if(v) write(0,*) "killing frequencies greater than ",fkill," at ",timeMin,cyclesKill,dsamp
     else
-      write(0,*) 'set dsamp to dmax'
+      write(0,*) 'set __dsamp to dmax'
       dsamp=dmax
     end if
+
+    write(0,*) __LINE__, 'dsamp', dsamp
 
     if(slow==1) dsamp=dmax
     fullsize=vel%n1+2*mod%bnd
@@ -248,6 +256,8 @@ contains
     write(0,*) __LINE__, 'ev:', ev(:)
     write(0,*) __LINE__, 'dsamp', dsamp
     write(0,*) __LINE__, 'error', error
+
+    !call exit()
 
     do i=1,3
       o(i)=max(bv(i),mymin(i)-dsamp*error)
