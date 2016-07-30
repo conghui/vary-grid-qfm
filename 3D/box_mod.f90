@@ -169,7 +169,7 @@ contains
     if(v) write(0,*) size(domain%hyper),"total speedup factor",tot2cells/tot1cells
     domain%totImaging=totImaging
 
-    call exit()
+    !call exit()
   end function
 
 
@@ -252,6 +252,7 @@ contains
     bv=(/vel%o1,vel%o2,vel%o3/)
     ev=bv+((/vel%n1,vel%n2,vel%n3/)-1)*(/vel%d1,vel%d2,vel%d3/)
 
+    write(0,*) __LINE__, 'fullsize:', fullsize
     write(0,*) __LINE__, 'bv:', bv(:)
     write(0,*) __LINE__, 'ev:', ev(:)
     write(0,*) __LINE__, 'dsamp', dsamp
@@ -278,6 +279,7 @@ contains
     write(0,*) __LINE__, 'mymax(:):', mymax(:)
     write(0,*) __LINE__, 'n(:):', n(:), 'dsamp', dsamp
     write(0,*) __LINE__, 'mod%bnd', mod%bnd
+    !call exit()
 
 
     mod%o1=o(1)-dsamp*(mod%bnd)
@@ -303,6 +305,7 @@ contains
     write(0,*) __LINE__, 'mod%dt:', mod%dt
     write(0,*) __LINE__, 'timeMax:', timeMax, ', timeMin:', timeMin
     write(0,*) __LINE__, 'ntblock:', mod%ntblock
+    write(0,*) __LINE__, 'dtextra:', mod%dtextra
     !call exit()
 
     if(slow==1) then
@@ -345,6 +348,7 @@ contains
     write(0,*) __LINE__, 'mod%b(:)', mod%b(:,1)
     write(0,*) __LINE__, 'mod%e(:)', mod%e(:,1)
     write(0,*) __LINE__, 'mod%n', mod%n1, mod%n2, mod%n3
+    write(0,*) __LINE__, 'dtbig', dtBig
     !call exit()
     smallsize=mod%n1*mod%n2*mod%n3
     mod%jimage=jimage
@@ -354,7 +358,15 @@ contains
     tot2cells=tot2cells+fullsize*(timeMax-timeMin)/dtBig
     totImaging=totImaging+mod%ntblock/jImage
     !  if(v) write(0,*) "new grid",mod%n1,mod%n2
+
+    write(0,*) 'smallsize:', smallsize
+    write(0,*) 'small:', smallsize*mod%ntblock
+    write(0,*) 'large:', fullsize*(timeMax-timeMin)/dtBig
+
+
     if(v) write(0,*) "speedup factor",(fullsize*(timeMax-timeMin)/dtBig)/(smallsize*mod%ntblock),mod%dt
+
+    call exit()
   end subroutine
 
   ! conghui: don't break axis at the first stage, set nblock to zero

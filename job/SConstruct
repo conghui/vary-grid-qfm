@@ -15,7 +15,7 @@ par = {
     'nz':400, 'oz':0, 'dz':0.032,  'lz':'z', 'uz':'km',
     'kt':80,
     'jsnap':100,
-    'nb':10,
+    'nb':20,
     'frq':20
     }
 fdmod.param(par)
