@@ -61,12 +61,15 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
     sf_warning("mymin[%d]: %f, mymax[%d]: %f", i, mymin[i], i, mymax[i]);
   }
 
+  sf_warning("dmax: %f", dmax);
   if (timemin > 0.0001) {
     sf_warning("compute __dsamp");
     float ff = 1.0 - 2.0 * SF_PI / qfact;
     float cycleskill = log(downfact) / log(ff);
     float fkill = cycleskill / fmaxf(timemin, 0.001);
-    dsamp = fmax(dmax, vmin/fminf(maxf, fkill) / 3.3 / errorfact);
+    /*dsamp = fmax(dmax, vmin/fminf(maxf, fkill) / 3.3 / errorfact);*/
+    /// if your unit is: km/s, then divide by 1000
+    dsamp = fmax(dmax, vmin/fminf(maxf, fkill) / 3.3 / errorfact / 1000);
   } else {
     sf_warning("direct set __dsamp to dmax");
     dsamp = dmax;
@@ -74,10 +77,6 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
 
   sf_warning("dsamp: %f", dsamp);
 
-  int fullsize = (vel->n1 + 2 * mod->nb) *
-                 (vel->n2 + 2 * mod->nb) *
-                 (vel->n3 + 2 * mod->nb);
-  sf_warning("fullsize: %d", fullsize);
   sf_warning("vel->o1: %f", vel->o1);
   sf_warning("vel->n1: %d", vel->n1);
 
@@ -90,6 +89,11 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
     sf_warning("bv[%d]: %f, ev[%d]: %f", i, bv[i], i, ev[i]);
   }
 
+  sf_warning("ev_: %f, %f, %f", ev[0], ev[1], ev[2]);
+  sf_warning("mymin_: %f, %f, %f", mymin[0], mymin[1], mymin[2]);
+  sf_warning("mymax_: %f, %f, %f", mymax[0], mymax[1], mymax[2]);
+  sf_warning("error: %f", error);
+  sf_warning("dsamp: %f", dsamp);
   float o[3];
   int   n[3];
   for (int i = 0; i < 3; i++) {
@@ -111,6 +115,7 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
   mod->n3 = n[2] + 2 * mod->nb;
 
   float dtmax = 0.49 * dsamp / vmax;
+  mod->dt = calgoodsampling(dtmax);
   mod->dt = 0.004; // TODO: update dt
   mod->ntblock = (timemax - timemin) / mod->dt;
   mod->dtextra = (timemax - timemin) - mod->dt * mod->ntblock;
@@ -121,16 +126,21 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
   sf_warning("mod->ntblock: %d", mod->ntblock);
   sf_warning("mod->dtextra: %f", mod->dtextra);
 
-  int smallsize = mod->n1 * mod->n2 * mod->n3;
+  float smallsize = 0.001 * mod->n1 * mod->n2 * mod->n3;
+  float fullsize =  0.001*(vel->n1+2*mod->nb)*(vel->n2+2*mod->nb)*(vel->n3+2*mod->nb);
   float small = smallsize * mod->ntblock;
   float large = fullsize * (timemax - timemin) / gs_dtbig;
+  /*sf_warning("smallsize_: %f, ntblock: %d, small: %f", smallsize, mod->ntblock, small);*/
+  /*sf_warning("small_: %d", small);*/
   *totalsmallcells += small;
   *totallargecells += large;
 
   sf_warning("dtbig: %f", gs_dtbig);
+  sf_warning("smallsize: %f, largesize: %f", smallsize, fullsize);
   sf_warning("small: %f, large: %f", small, large);
   sf_warning("speedup factor: %f", large / small);
-  exit(0);
+
+  /*exit(0);*/
 }
 
 times_t *read_times() {
