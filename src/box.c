@@ -6,16 +6,15 @@ static float gs_vmin;
 static float gs_vmax;
 static float gs_dmin;
 static float gs_dmax;
-static float gs_dtstable; // maximum sampling in time for stability
 static float gs_dtbig;
 static float gs_maxf; // maximum frequency
 static int   gs_nb; // boundary
-static int   gs_error;
+static float gs_error;
 static float gs_errorfact;
 static float gs_qfact;
 static float gs_downfact;
 
-static float calgoodsampling(dt) {
+static float calgoodsampling(float dt) {
   return 0.95 * dt;
 }
 
@@ -43,7 +42,7 @@ static void find_exts(const int *ns, const float *os, const float *ds, float ***
   }
 }
 
-static void create_modeling(modeling_t *mod, const times_t *times, float ***minT, float vmin, float dmax, float maxf, float timemin, float timemax, float qfact, float downfact, float errorfact)
+static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *times, float ***minT, float vmin, float vmax, float dmax, float maxf, float timemin, float timemax, float qfact, float downfact, float errorfact, float error, float *totallargecells, float *totalsmallcells)
 {
   int   ns[3] = {times->n1, times->n2, times->n3};
   float os[3] = {times->o1, times->o2, times->o3};
@@ -75,7 +74,63 @@ static void create_modeling(modeling_t *mod, const times_t *times, float ***minT
 
   sf_warning("dsamp: %f", dsamp);
 
-  /*exit(0);*/
+  int fullsize = (vel->n1 + 2 * mod->nb) *
+                 (vel->n2 + 2 * mod->nb) *
+                 (vel->n3 + 2 * mod->nb);
+  sf_warning("fullsize: %d", fullsize);
+  sf_warning("vel->o1: %f", vel->o1);
+  sf_warning("vel->n1: %d", vel->n1);
+
+  float bv[3] = {vel->o1, vel->o2, vel->o3};
+  float ev[3] = {vel->o1 + (vel->n1 - 1) * vel->d1,
+                 vel->o2 + (vel->n2 - 1) * vel->d2,
+                 vel->o3 + (vel->n3 - 1) * vel->d3};
+
+  for (int i = 0; i < 3; i++) {
+    sf_warning("bv[%d]: %f, ev[%d]: %f", i, bv[i], i, ev[i]);
+  }
+
+  float o[3];
+  int   n[3];
+  for (int i = 0; i < 3; i++) {
+    o[i] = fmaxf(bv[i], mymin[i] - dsamp * error);
+    mymax[i] = fminf(ev[i], mymax[i] + dsamp * error);
+    n[i] = ceilf((mymax[i] - mymin[i]) / dsamp) + 1;
+  }
+
+  sf_warning("o(:): %f, %f, %f", o[0], o[1], o[2]);
+  sf_warning("mymax(:): %f, %f, %f", mymax[0], mymax[1], mymax[2]);
+  sf_warning("n(:): %d, %d, %d", n[0], n[1], n[2]);
+
+  mod->d1 = mod->d2 = mod->d3 = dsamp;
+  mod->o1 = o[0] - mod->d1 * mod->nb;
+  mod->o2 = o[1] - mod->d2 * mod->nb;
+  mod->o3 = o[2] - mod->d3 * mod->nb;
+  mod->n1 = n[0] + 2 * mod->nb;
+  mod->n2 = n[1] + 2 * mod->nb;
+  mod->n3 = n[2] + 2 * mod->nb;
+
+  float dtmax = 0.49 * dsamp / vmax;
+  mod->dt = 0.004; // TODO: update dt
+  mod->ntblock = (timemax - timemin) / mod->dt;
+  mod->dtextra = (timemax - timemin) - mod->dt * mod->ntblock;
+
+  sf_warning("mod->n(:): %d, %d, %d", mod->n1, mod->n2, mod->n3);
+  sf_warning("mod->o(:): %f, %f, %f", mod->o1, mod->o2, mod->o3);
+  sf_warning("mod->d(:): %f, %f, %f", mod->d1, mod->d2, mod->d3);
+  sf_warning("mod->ntblock: %d", mod->ntblock);
+  sf_warning("mod->dtextra: %f", mod->dtextra);
+
+  int smallsize = mod->n1 * mod->n2 * mod->n3;
+  float small = smallsize * mod->ntblock;
+  float large = fullsize * (timemax - timemin) / gs_dtbig;
+  *totalsmallcells += small;
+  *totallargecells += large;
+
+  sf_warning("dtbig: %f", gs_dtbig);
+  sf_warning("small: %f, large: %f", small, large);
+  sf_warning("speedup factor: %f", large / small);
+  exit(0);
 }
 
 times_t *read_times() {
@@ -106,7 +161,7 @@ times_t *read_times() {
   return t;
 }
 
-void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, float maxf, int   nb, int   error, float errorfact, float qfact, float downfact)
+void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, float maxf, int   nb, float   error, float errorfact, float qfact, float downfact)
 {
   gs_timeblocks = timeblocks;
   gs_vmin       = vmin;
@@ -120,11 +175,15 @@ void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, 
   gs_qfact      = qfact;
   gs_downfact   = downfact;
 
-  gs_dtstable   = 0.499 * dmin / vmax;
-  gs_dtbig      = calgoodsampling(gs_dtstable);
+  float dstable   = 0.499 * dmin / vmax;
+  gs_dtbig      = calgoodsampling(dstable);
+
+  sf_warning("dmin: %f, vmax: %f", dmin, vmax);
+  sf_warning("dstable: %f", dstable);
+  sf_warning("gs_dtbig: %f", gs_dtbig);
 }
 
-void calc_shot_box(const times_t *times, const pt3d *src3d, const pt3d *rec3d, int nr, int nt, float dt) {
+void calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, const pt3d *rec3d, int nr, int nt, float dt) {
 
   int i4 = (src3d->x - times->o4) / times->d4 + 0.5;
   int i5 = (src3d->y - times->o5) / times->d5 + 0.5;
@@ -164,12 +223,18 @@ void calc_shot_box(const times_t *times, const pt3d *src3d, const pt3d *rec3d, i
   sf_warning("timeblocks: %d", timeblocks);
   sf_warning("blocktime: %f", blocktime);
 
+  float totallargecells = 0;
+  float totalsmallcells = 0;
+
   for (int i = 0; i < timeblocks; i++) {
+    domain.hyper[i].nb = gs_nb;
     float timemin = i * blocktime;
     float timemax = timemin + blocktime;
 
-    /*create_modeling(&domain.hyper[i], times, minT, timemax);*/
-  create_modeling(&domain.hyper[i], times, minT, gs_vmin, gs_dmax, gs_maxf, timemin, timemax, gs_qfact, gs_downfact, gs_errorfact);
+  create_modeling(&domain.hyper[i], vel, times, minT, gs_vmin, gs_vmax, gs_dmax, gs_maxf, timemin, timemax, gs_qfact, gs_downfact, gs_errorfact, gs_error, &totallargecells, &totalsmallcells);
 
   }
+
+  float totalspeedup = totallargecells / totalsmallcells;
+  sf_warning("timeblocks: %d, totalspeedup: %f", timeblocks, totalspeedup);
 }

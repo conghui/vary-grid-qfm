@@ -2,6 +2,7 @@
 #define BOX_H_MLWKBDTF
 
 #include <rsf.h>
+#include "vel.h"
 
 typedef struct {
   int n1, n2, n3, n4, n5;
@@ -12,8 +13,8 @@ typedef struct {
 } times_t;
 
 typedef struct {
-  int n1, n2, n3;
-  float o1, o2, o3;
+  int n1, n2, n3;   // extended size
+  float o1, o2, o3; // extended region
   float d1, d2, d3;
   int nb;
   float dt, dtextra;
@@ -30,7 +31,7 @@ typedef struct  {
 
 times_t *read_times();
 
-void calc_shot_box(const times_t *times, const pt3d *src3d, const pt3d *rec3d, int nr, int nt, float dt);
+void calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, const pt3d *rec3d, int nr, int nt, float dt);
 
-void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, float maxf, int   nb, int   error, float errorfact, float qfact, float downfact);
+void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, float maxf, int   nb, float error, float errorfact, float qfact, float downfact);
 #endif /* end of include guard: BOX_H_MLWKBDTF */

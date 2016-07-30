@@ -29,7 +29,7 @@ int main(int argc, char** argv)
   int fdorder;  /* finite difference spatial accuracy order */
   int nzpad,nxpad,nypad; /* boundary padded model size */
   int ix,iy,it,nx,ny,nz,nt,ns,nr;
-  float dx,dy,dz,dt,dt2;
+  float ox,oy,oz,dx,dy,dz,dt,dt2;
   float* damp=NULL; /* damping profile for hybrid bc */
   float* ws;  /* wavelet */
   float*** vel=NULL;  /* velocity */
@@ -122,9 +122,9 @@ int main(int argc, char** argv)
   ar = sf_iaxa(file_rec,2); sf_setlabel(ar,"r"); if(verb) sf_raxa(ar); /* receivers */
 
   nt = sf_n(at); dt = sf_d(at);
-  nz = sf_n(az); dz = sf_d(az);
-  nx = sf_n(ax); dx = sf_d(ax);
-  ny = sf_n(ay); dy = sf_d(ay);
+  nz = sf_n(az); dz = sf_d(az); oz = sf_o(az);
+  nx = sf_n(ax); dx = sf_d(ax); ox = sf_o(ax);
+  ny = sf_n(ay); dy = sf_d(ay); oy = sf_o(ay);
   ns = sf_n(as);
   nr = sf_n(ar);
 
@@ -268,7 +268,7 @@ int main(int argc, char** argv)
   float dmax;
   float maxf; // maximum frequency
   int   nb; // boundary
-  int   error;
+  float   error;
   float errorfact;
   float qfact;
   float downfact;
@@ -276,7 +276,7 @@ int main(int argc, char** argv)
 
   if (!sf_getint("timeblocks", &timeblocks)) timeblocks = 40;
   if (!sf_getfloat("maxf", &maxf)) maxf = 80;
-  if (!sf_getint("error", &error)) error = 20;
+  if (!sf_getfloat("error", &error)) error = 20; // unit: km, fortran unit: m
   if (!sf_getfloat("errorfact", &errorfact)) errorfact = 1.2;
   if (!sf_getfloat("downfact", &downfact)) downfact = 0.04;
   if (!sf_getfloat("qfact", &qfact)) qfact = 50; // copy from vel_mod.f90
@@ -284,13 +284,17 @@ int main(int argc, char** argv)
 
   nb = nbd;
 
-  vel_t *vv0 = clone_vel(vel, sf_n(az), sf_n(ax), sf_n(ay), sf_o(az), sf_o(ax), sf_o(ay), sf_d(az), sf_d(ax), sf_d(ay), w0, qfact);
+  float ***v0 = sf_floatalloc3(nz, nx, ny);
+  sf_seek(file_vel, 0, SEEK_SET);
+  sf_floatread(v0[0][0], nx*ny*nz, file_vel);
+  vel_t *vv0 = clone_vel(v0, nz, nx, ny, oz, ox, oy, dz, dx, dy, w0, qfact);
   vmin_vmax_dmin_dmax(vv0, &vmin, &vmax, &dmin, &dmax);
 
+  sf_warning("vmin: %f, vmax: %f, dmin: %f, dmax: %f", vmin, vmax, dmin, dmax);
   times_t *times = read_times();
   init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact);
 
-  calc_shot_box(times, src3d, rec3d, nr, nt, dt);
+  calc_shot_box(vv0, times, src3d, rec3d, nr, nt, dt);
   sf_warning("program exit before loop");
   exit(0);
 
