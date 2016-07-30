@@ -10,6 +10,7 @@ fdutil.c
 step-forward.c
 common.c
 box.c
+vel.c
           """.split()
 
 include_dir = [

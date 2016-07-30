@@ -3,24 +3,7 @@
 #include "common.h"
 #include "step-forward.h"
 #include "box.h"
-
-static void vmin_vmax_dmin_dmax(float ***vel, sf_axis az, sf_axis ax, sf_axis ay, float *vmin, float *vmax, float *dmin, float *dmax) 
-{
-  *vmin = *dmin = 99999999;
-  *vmax = *dmax = 0;
-
-  for (int i3 = 0; i3 < sf_n(ay); i3++) {
-    for (int i2 = 0; i2 < sf_n(ax); i2++) {
-      for (int i1 = 0; i1 < sf_n(az); i1++) {
-        *vmin = fminf(*vmin, vel[i3][i2][i1]);
-        *vmax = fmaxf(*vmax, vel[i3][i2][i1]);
-      }
-    }
-  }
-
-  *dmin = fminf(fminf(sf_d(az), sf_d(ax)), sf_d(ay));
-  *dmax = fmaxf(fmaxf(sf_d(az), sf_d(ax)), sf_d(ay));
-}
+#include "vel.h"
 
 int main(int argc, char** argv)
 {
@@ -289,6 +272,7 @@ int main(int argc, char** argv)
   float errorfact;
   float qfact;
   float downfact;
+  float w0; // for velocity
 
   if (!sf_getint("timeblocks", &timeblocks)) timeblocks = 40;
   if (!sf_getfloat("maxf", &maxf)) maxf = 80;
@@ -296,9 +280,12 @@ int main(int argc, char** argv)
   if (!sf_getfloat("errorfact", &errorfact)) errorfact = 1.2;
   if (!sf_getfloat("downfact", &downfact)) downfact = 0.04;
   if (!sf_getfloat("qfact", &qfact)) qfact = 50; // copy from vel_mod.f90
+  if (!sf_getfloat("w0", &w0)) w0 = 60;
 
   nb = nbd;
-  vmin_vmax_dmin_dmax(vel, az, ax, ay, &vmin, &vmax, &dmin, &dmax);
+
+  vel_t *vv0 = clone_vel(vel, sf_n(az), sf_n(ax), sf_n(ay), sf_o(az), sf_o(ax), sf_o(ay), sf_d(az), sf_d(ax), sf_d(ay), w0, qfact);
+  vmin_vmax_dmin_dmax(vv0, &vmin, &vmax, &dmin, &dmax);
 
   times_t *times = read_times();
   init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact);

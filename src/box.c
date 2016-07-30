@@ -74,6 +74,7 @@ static void create_modeling(modeling_t *mod, const times_t *times, float ***minT
   }
 
   sf_warning("dsamp: %f", dsamp);
+
   /*exit(0);*/
 }
 
