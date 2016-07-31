@@ -3,6 +3,7 @@ Import('*')
 
 bin_list = [
 ("test", "main-test.c"),
+("fd3d", "main-fd3d.c"),
 ]
 
 modules = """

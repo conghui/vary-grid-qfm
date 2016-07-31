@@ -1,0 +1,98 @@
+##
+ # 3D forward modeling
+ ##
+
+from rsf.proj import *
+import fdmod
+import math
+
+def mkloc(tag, par, out):
+  Flow(tag + 'loc_', None,
+      '''math output=0
+      n1=%(nz)d o1=%(oz)g d1=%(dz)g label=%(lz)s unit=%(uz)s
+      n2=%(nx)d o2=%(ox)g d2=%(dx)g label=%(lx)s unit=%(ux)s
+      n3=%(ny)d o3=%(oy)g d3=%(dy)g label=%(ly)s unit=%(uy)s
+      ''' % par)
+
+  Flow(tag + 'loc_z', tag + 'loc_', 'math output=x1')
+  Flow(tag + 'loc_x', tag + 'loc_', 'math output=x2')
+  Flow(tag + 'loc_y', tag + 'loc_', 'math output=x3')
+  Flow(out, [tag + 'loc_x', tag + 'loc_y', tag + 'loc_z'],
+      ''' cat axis=4 space=n ${SOURCES[1]} ${SOURCES[2]} |
+      transp plane=14 | transp plane=24 | transp plane=34 |
+      put label1="(x,y,z)" label2="Z" label3="X" label4="Y"
+      ''')
+
+
+# ------------------------------------------------------------
+par = {
+    'nt':800, 'ot':0, 'dt':0.002, 'lt':'t', 'ut':'s',
+
+    # velocity
+    'nz':200, 'oz':0, 'dz':0.01,  'lz':'z', 'uz':'km',
+    'nx':400, 'ox':0, 'dx':0.02,  'lx':'x', 'ux':'km',
+    'ny':400, 'oy':0, 'dy':0.02,  'ly':'y', 'uy':'km',
+
+    'kt':80,
+    'jsnap':20,
+    'nb':10,
+    'frq':20
+    }
+
+# source location
+src_par = {
+    'nz':1, 'oz':0, 'dz':0.01,  'lz':'z', 'uz':'km',
+    'nx':1, 'ox':4, 'dx':0.02,  'lx':'x', 'ux':'km',
+    'ny':1, 'oy':4, 'dy':0.02,  'ly':'y', 'uy':'km',
+    }
+
+# receiver location
+rec_par = {
+    'nz':200, 'oz':0, 'dz':0.01,  'lz':'z', 'uz':'km',
+    'nx':400, 'ox':0, 'dx':0.02,  'lx':'x', 'ux':'km',
+    'ny':400, 'oy':0, 'dy':0.02,  'ly':'y', 'uy':'km',
+    }
+
+fdmod.param(par)
+par['jrr']=1
+
+# ------------------------------------------------------------
+# source/receiver coordinates
+# ------------------------------------------------------------
+par['ixsou']=par['nx']/2
+par['iysou']=par['ny']/2
+
+par['xsou']=par['ox']+par['ixsou']*par['dx']
+par['ysou']=par['oy']+par['iysou']*par['dy']
+par['zsou']=par['oz']
+fdmod.point3d('ss-3d',par['xsou'],par['ysou'],par['zsou'],par)
+
+
+mkloc('r', rec_par, 'rr-3d')
+
+# ------------------------------------------------------------
+# wavelet
+fdmod.wavelet('wav_',par['frq'],par)
+Flow(  'wav','wav_','transp')
+Result('wav','transp |' + fdmod.waveplot(''+par['labelrot2'],par))
+
+# ------------------------------------------------------------
+# velocity
+Flow('vel-3d',None,
+     '''
+     math output=2
+     n1=%(nz)d o1=%(oz)g d1=%(dz)g
+     n2=%(nx)d o2=%(ox)g d2=%(dx)g
+     n3=%(ny)d o3=%(oy)g d3=%(dy)g |
+     put label1=%(lz)s label2=%(lx)s unit1=%(uz)s unit2=%(ux)s label3=%(ly)s unit3=%(uy)s
+     ''' %par)
+
+# 3D acoustic modeling
+Flow(['dd-3d', 'ww-3d'],['wav', 'vel-3d','ss-3d', 'rr-3d'],
+    '''../../bin/fd3d ompchunk=%(ompchunk)d ompnth=%(ompnth)d cden=y
+            verb=y free=n snap=%(snap)s jsnap=%(jsnap)d jdata=%(jdata)d
+            nb=%(nb)d dabc=%(dabc)s
+            vel=${SOURCES[1]} sou=${SOURCES[2]} rec=${SOURCES[3]} wfl=${TARGETS[1]}
+    ''' % par)
+
+End()
