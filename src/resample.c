@@ -1,5 +1,6 @@
 #include "resample.h"
 #include "check.h"
+#include <assert.h>
 
 static int gs_ns;
 static int gs_npts;
@@ -202,7 +203,7 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
     /*sf_warning("%f", x3[i]);*/
   /*}*/
 
-  int *k1  = sf_intalloc(news->n1);
+  int *k1  = sf_intalloc(news->n1); assert(k1);
   int *k2  = sf_intalloc(news->n2);
   int *k3  = sf_intalloc(news->n3);
   int *t1    = sf_intalloc(news->n1);

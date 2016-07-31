@@ -20,5 +20,7 @@ vel_t *clone_vel(float ***vel, int nz, int nx, int ny,
 
 vel_t *read_vel(const char *tag);
 modeling_t make_modeling(const vel_t *v);
+void resample_vel(const modeling_t *olds, const modeling_t *news, const vel_t *oldv, vel_t *newv);
+void resample_p(const modeling_t *olds, const modeling_t *news, float ****p);
 
 #endif /* end of include guard: VEL_H_BLY3XMED */

@@ -1,4 +1,5 @@
 #include "vel.h"
+#include "resample.h"
 
 #include <rsf.h>
 
@@ -47,8 +48,9 @@ vel_t *clone_vel(float ***vel, int nz, int nx, int ny,
   v->n1 = nz; v->n2 = nx; v->n3 = ny;
   v->o1 = oz; v->o2 = ox; v->o3 = oy;
   v->d1 = dz; v->d2 = dx; v->d3 = dy;
-  v->dat = vel;
-  v->vgamma = NULL;
+  v->dat = sf_floatalloc3(nz, nx, ny);
+  memcpy(v->dat[0][0], vel[0][0], nz*nx*ny*sizeof(float));
+  v->vgamma = sf_floatalloc3(1,1,1);
 
   gs_w0 = w0; gs_qfact= qfact;
   gs_gamma = 1.0/SF_PI*atan(2*SF_PI/qfact);
@@ -72,4 +74,26 @@ void vmin_vmax_dmin_dmax(const vel_t *vel, float *vmin, float *vmax, float *dmin
 
   *dmin = fminf(fminf(vel->d1, vel->d2), vel->d3);
   *dmax = fmaxf(fmaxf(vel->d1, vel->d2), vel->d3);
+}
+
+void resample_vel(const modeling_t *olds, const modeling_t *news, const vel_t *oldv, vel_t *newv) {
+  free(**newv->dat); free(*newv->dat); free(newv->dat);
+  free(**newv->vgamma); free(*newv->vgamma); free(newv->vgamma);
+
+  newv->dat = sf_floatalloc3(news->n1, news->n2, news->n3);
+  newv->vgamma = sf_floatalloc3(news->n1, news->n2, news->n3);
+  
+  interpfield(olds, news, oldv->dat, newv->dat, true);
+
+  // TODO: we doesn't set gvamma yet
+
+}
+
+void resample_p(const modeling_t *olds, const modeling_t *news, float ****p)
+{
+  float ***newp = sf_floatalloc3(news->n1, news->n2, news->n3);
+  interpfield(olds, news, *p, newp, false);
+
+  free((*p)[0][0]); free((*p)[0]); free(*p);
+  *p = newp;
 }

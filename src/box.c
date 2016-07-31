@@ -193,7 +193,7 @@ void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, 
   sf_warning("gs_dtbig: %f", gs_dtbig);
 }
 
-void calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, const pt3d *rec3d, int nr, int nt, float dt) {
+box_t *calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, const pt3d *rec3d, int nr, int nt, float dt) {
 
   int i4 = (src3d->x - times->o4) / times->d4 + 0.5;
   int i5 = (src3d->y - times->o5) / times->d5 + 0.5;
@@ -224,9 +224,10 @@ void calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, co
   sf_putint(file_minT, "n3", times->n3);
   sf_floatwrite(minT[0][0], times->n1 * times->n2 * times->n3, file_minT);
 
-  box_t domain;
+  box_t *domain = malloc(sizeof *domain);
   int timeblocks = gs_timeblocks; // global variable
-  domain.hyper = malloc(timeblocks * sizeof(*domain.hyper));
+  domain->timeblocks = timeblocks;
+  domain->hyper = malloc(timeblocks * sizeof(*domain->hyper));
   /// time fdm3d doesn't initialized
   float blocktime = nt * dt / timeblocks;
 
@@ -237,14 +238,16 @@ void calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, co
   float totalsmallcells = 0;
 
   for (int i = 0; i < timeblocks; i++) {
-    domain.hyper[i].nb = gs_nb;
+    domain->hyper[i].nb = gs_nb;
     float timemin = i * blocktime;
     float timemax = timemin + blocktime;
 
-  create_modeling(&domain.hyper[i], vel, times, minT, gs_vmin, gs_vmax, gs_dmax, gs_maxf, timemin, timemax, gs_qfact, gs_downfact, gs_errorfact, gs_error, &totallargecells, &totalsmallcells);
+  create_modeling(&domain->hyper[i], vel, times, minT, gs_vmin, gs_vmax, gs_dmax, gs_maxf, timemin, timemax, gs_qfact, gs_downfact, gs_errorfact, gs_error, &totallargecells, &totalsmallcells);
 
   }
 
   float totalspeedup = totallargecells / totalsmallcells;
   sf_warning("timeblocks: %d, totalspeedup: %f", timeblocks, totalspeedup);
+
+  return domain;
 }

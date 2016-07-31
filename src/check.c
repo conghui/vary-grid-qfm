@@ -20,6 +20,15 @@ int isum1(const int *a, int n) {
 
 }
 
+void write3df(const char *file, float ***dat, int n1, int n2, int n3) 
+{
+  sf_file f = sf_output(file);
+  sf_putint(f, "n1", n1); sf_putfloat(f, "o1", 0); sf_putfloat(f, "d1", 0);
+  sf_putint(f, "n2", n2); sf_putfloat(f, "o2", 0); sf_putfloat(f, "d2", 0);
+  sf_putint(f, "n3", n3); sf_putfloat(f, "o3", 0); sf_putfloat(f, "d3", 0);
+  sf_floatwrite(dat[0][0], n1*n2*n3, f);
+}
+
 void write2df(const char *file, float **dat, int n1, int n2) {
   sf_file f = sf_output(file);
   sf_putint(f, "n1", n1); sf_putfloat(f, "o1", 0); sf_putfloat(f, "d1", 0);

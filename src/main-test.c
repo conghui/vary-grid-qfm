@@ -3,6 +3,7 @@
 #include "common.h"
 #include "step-forward.h"
 #include "box.h"
+#include "check.h"
 #include "vel.h"
 #include "resample.h"
 
@@ -261,22 +262,22 @@ int main(int argc, char** argv)
   }
 
   /////////////////////// add code here //////////////////
-  sf_warning("test interpolation");
-  vel_t *oldv = read_vel("v0");
-  vel_t *newv = read_vel("v1");
-  modeling_t olds = make_modeling(oldv);
-  modeling_t news = make_modeling(newv);
+  /*sf_warning("test interpolation");*/
+  /*vel_t *oldv = read_vel("v0");*/
+  /*vel_t *newv = read_vel("v1");*/
+  /*modeling_t olds = make_modeling(oldv);*/
+  /*modeling_t news = make_modeling(newv);*/
 
-  init_sinc_table(8, 10000);
-  interpfield(&olds, &news, oldv->dat, newv->dat, false);
+  /*init_sinc_table(8, 10000);*/
+  /*interpfield(&olds, &news, oldv->dat, newv->dat, false);*/
 
-  sf_file fv2 = sf_output("v2");
-  sf_putint(fv2, "n1", newv->n1); sf_putfloat(fv2, "o1", newv->o1); sf_putfloat(fv2, "d1", newv->d1);
-  sf_putint(fv2, "n2", newv->n2); sf_putfloat(fv2, "o2", newv->o2); sf_putfloat(fv2, "d2", newv->d2);
-  sf_putint(fv2, "n3", newv->n3); sf_putfloat(fv2, "o3", newv->o3); sf_putfloat(fv2, "d3", newv->d3);
-  sf_floatwrite(newv->dat[0][0], newv->n1*newv->n2*newv->n3, fv2);
+  /*sf_file fv2 = sf_output("v2");*/
+  /*sf_putint(fv2, "n1", newv->n1); sf_putfloat(fv2, "o1", newv->o1); sf_putfloat(fv2, "d1", newv->d1);*/
+  /*sf_putint(fv2, "n2", newv->n2); sf_putfloat(fv2, "o2", newv->o2); sf_putfloat(fv2, "d2", newv->d2);*/
+  /*sf_putint(fv2, "n3", newv->n3); sf_putfloat(fv2, "o3", newv->o3); sf_putfloat(fv2, "d3", newv->d3);*/
+  /*sf_floatwrite(newv->dat[0][0], newv->n1*newv->n2*newv->n3, fv2);*/
 
-  exit(0);
+  /*exit(0);*/
 
   sf_warning("begin conghui's code");
   int   timeblocks;
@@ -312,7 +313,22 @@ int main(int argc, char** argv)
   times_t *times = read_times();
   init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact);
 
-  calc_shot_box(vv0, times, src3d, rec3d, nr, nt, dt);
+  box_t *domain = calc_shot_box(vv0, times, src3d, rec3d, nr, nt, dt);
+
+  init_sinc_table(8, 10000);
+  vel_t *vuse = clone_vel(v0, nz, nx, ny, oz, ox, oy, dz, dx, dy, w0, qfact);
+  modeling_t initmodel = make_modeling(vv0);
+
+  for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
+    sf_warning("FORWARD BLOCK: %d", iblock);
+    modeling_t *cur = &domain->hyper[iblock];
+
+    resample_vel(&initmodel, cur, vv0, vuse);
+    /*resample_p(&*/
+    write3df("vb0.rsf", vuse->dat, cur->n1, cur->n2, cur->n3); 
+    break;
+  }
+
   sf_warning("program exit before loop");
   exit(0);
 
