@@ -6,32 +6,22 @@ from rsf.proj import *
 import fdmod
 import math
 
-def mkloc(tag, par, out):
-  Flow(tag + 'loc_', None,
-      '''math output=0
-      n1=%(nz)d o1=%(oz)g d1=%(dz)g label=%(lz)s unit=%(uz)s
-      n2=%(nx)d o2=%(ox)g d2=%(dx)g label=%(lx)s unit=%(ux)s
-      n3=%(ny)d o3=%(oy)g d3=%(dy)g label=%(ly)s unit=%(uy)s
-      ''' % par)
-
-  Flow(tag + 'loc_z', tag + 'loc_', 'math output=x1')
-  Flow(tag + 'loc_x', tag + 'loc_', 'math output=x2')
-  Flow(tag + 'loc_y', tag + 'loc_', 'math output=x3')
-  Flow(out, [tag + 'loc_x', tag + 'loc_y', tag + 'loc_z'],
-      ''' cat axis=4 space=n ${SOURCES[1]} ${SOURCES[2]} |
-      transp plane=14 | transp plane=24 | transp plane=34 |
-      put label1="(x,y,z)" label2="Z" label3="X" label4="Y"
-      ''')
-
-
 # ------------------------------------------------------------
 par = {
     'nt':800, 'ot':0, 'dt':0.002, 'lt':'t', 'ut':'s',
 
     # velocity
-    'nz':200, 'oz':0, 'dz':0.01,  'lz':'z', 'uz':'km',
-    'nx':400, 'ox':0, 'dx':0.02,  'lx':'x', 'ux':'km',
-    'ny':400, 'oy':0, 'dy':0.02,  'ly':'y', 'uy':'km',
+    'nz':200, 'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
+    'nx':400, 'ox':0, 'dx':20,  'lx':'x', 'ux':'m',
+    'ny':400, 'oy':0, 'dy':20,  'ly':'y', 'uy':'m',
+
+    # receiver location
+    'rnz':1,   'roz':0, 'rdz':10,
+    'rnx':400, 'rox':0, 'rdx':20,
+    'rny':400, 'roy':0, 'rdy':20,
+
+    # source location (only support one shot)
+    'sz': 0, 'sx':4000,'sy':4000, # unit: m
 
     'kt':80,
     'jsnap':20,
@@ -39,36 +29,34 @@ par = {
     'frq':20
     }
 
-# source location
-src_par = {
-    'nz':1, 'oz':0, 'dz':0.01,  'lz':'z', 'uz':'km',
-    'nx':1, 'ox':4, 'dx':0.02,  'lx':'x', 'ux':'km',
-    'ny':1, 'oy':4, 'dy':0.02,  'ly':'y', 'uy':'km',
-    }
-
-# receiver location
-rec_par = {
-    'nz':200, 'oz':0, 'dz':0.01,  'lz':'z', 'uz':'km',
-    'nx':400, 'ox':0, 'dx':0.02,  'lx':'x', 'ux':'km',
-    'ny':400, 'oy':0, 'dy':0.02,  'ly':'y', 'uy':'km',
-    }
-
 fdmod.param(par)
-par['jrr']=1
 
 # ------------------------------------------------------------
 # source/receiver coordinates
+Flow('ss-3d', None,
+    '''spike nsp=3 mag=%(sx)g,%(sy)g,%(sz)g n1=3 k1=1,2,3
+    n1=3 label1="(x,y,z)" unit=
+    n2=1 label2="Z" unit=
+    n3=1 label3="X" unit=
+    n4=1 label4="Y"''' % par)
+
 # ------------------------------------------------------------
-par['ixsou']=par['nx']/2
-par['iysou']=par['ny']/2
+# receiver coordinates
+Flow('r_', None,
+    '''math output=0
+    n1=%(rnz)d o1=%(roz)g d1=%(rdz)g label=%(lz)s unit=%(uz)s
+    n2=%(rnx)d o2=%(rox)g d2=%(rdx)g label=%(lx)s unit=%(ux)s
+    n3=%(rny)d o3=%(roy)g d3=%(rdy)g label=%(ly)s unit=%(uy)s
+    ''' % par)
 
-par['xsou']=par['ox']+par['ixsou']*par['dx']
-par['ysou']=par['oy']+par['iysou']*par['dy']
-par['zsou']=par['oz']
-fdmod.point3d('ss-3d',par['xsou'],par['ysou'],par['zsou'],par)
-
-
-mkloc('r', rec_par, 'rr-3d')
+Flow('r_z', 'r_', 'math output=x1')
+Flow('r_x', 'r_', 'math output=x2')
+Flow('r_y', 'r_', 'math output=x3')
+Flow('rr-3d', ['r_x', 'r_y', 'r_z'],
+    ''' cat axis=4 space=n ${SOURCES[1]} ${SOURCES[2]} |
+    transp plane=14 | transp plane=24 | transp plane=34 |
+    put label1="(x,y,z)" label2="Z" label3="X" label4="Y"
+    ''')
 
 # ------------------------------------------------------------
 # wavelet
@@ -80,7 +68,7 @@ Result('wav','transp |' + fdmod.waveplot(''+par['labelrot2'],par))
 # velocity
 Flow('vel-3d',None,
      '''
-     math output=2
+     math output=2000
      n1=%(nz)d o1=%(oz)g d1=%(dz)g
      n2=%(nx)d o2=%(ox)g d2=%(dx)g
      n3=%(ny)d o3=%(oy)g d3=%(dy)g |
