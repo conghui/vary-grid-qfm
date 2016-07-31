@@ -168,14 +168,14 @@ void init_sinc_table(int nsinc, int npts)
 
   mksinc_table(npts, nsinc, gs_sinc_table);
 
-  sf_file ftable = sf_output("sinc.rsf");
-  sf_putint(ftable, "n1", nsinc);
-  sf_putint(ftable, "n2", npts);
-  sf_putfloat(ftable, "o1", 0);
-  sf_putfloat(ftable, "o2", 0);
-  sf_putfloat(ftable, "d1", 0);
-  sf_putfloat(ftable, "d2", 0);
-  sf_floatwrite(gs_sinc_table[0], nsinc * npts, ftable);
+  /*sf_file ftable = sf_output("sinc.rsf");*/
+  /*sf_putint(ftable, "n1", nsinc);*/
+  /*sf_putint(ftable, "n2", npts);*/
+  /*sf_putfloat(ftable, "o1", 0);*/
+  /*sf_putfloat(ftable, "o2", 0);*/
+  /*sf_putfloat(ftable, "d1", 0);*/
+  /*sf_putfloat(ftable, "d2", 0);*/
+  /*sf_floatwrite(gs_sinc_table[0], nsinc * npts, ftable);*/
 }
 
 void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, float ***newf, bool extend)
@@ -222,8 +222,8 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
   up_clip(t2, news->n2, gs_npts - 1);
   up_clip(t3, news->n3, gs_npts - 1);
 
-  sf_warning("sumk1, sumk2, sumk3: %d, %d, %d", isum1(k1,news->n1), isum1(k2,news->n2), isum1(k3, news->n3));
-  sf_warning("sumt1, sumt2, sumt3: %d, %d, %d", isum1(t1,news->n1), isum1(t2,news->n2), isum1(t3, news->n3));
+  /*sf_warning("sumk1, sumk2, sumk3: %d, %d, %d", isum1(k1,news->n1), isum1(k2,news->n2), isum1(k3, news->n3));*/
+  /*sf_warning("sumt1, sumt2, sumt3: %d, %d, %d", isum1(t1,news->n1), isum1(t2,news->n2), isum1(t3, news->n3));*/
 
   for (int is = 0; is < ns; is++) {
     for (int i1 = 0; i1 < news->n1; i1++) {
@@ -241,15 +241,15 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
   updown_cip(c2, ns, news->n2, 0, olds->n2-1);
   updown_cip(c3, ns, news->n3, 0, olds->n3-1);
 
-  for (int i = 0; i < ns; i++) {
-    sf_warning("c1[0][%d]: %d", i, c1[0][i]);
-  }
-  sf_warning("write c1, c2, c3");
-  write2di("c1.rsf", c1, ns, news->n1);
-  write2di("c2.rsf", c2, ns, news->n2);
-  write2di("c3.rsf", c3, ns, news->n3);
+  /*for (int i = 0; i < ns; i++) {*/
+    /*sf_warning("c1[0][%d]: %d", i, c1[0][i]);*/
+  /*}*/
+  /*sf_warning("write c1, c2, c3");*/
+  /*write2di("c1.rsf", c1, ns, news->n1);*/
+  /*write2di("c2.rsf", c2, ns, news->n2);*/
+  /*write2di("c3.rsf", c3, ns, news->n3);*/
 
-  write1di("t1.rsf", t1, news->n1);
+  /*write1di("t1.rsf", t1, news->n1);*/
   /*exit(0);*/
 
   if (extend) {

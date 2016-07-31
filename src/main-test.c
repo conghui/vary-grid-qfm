@@ -7,6 +7,16 @@
 #include "vel.h"
 #include "resample.h"
 
+fdm3d mkfdm(bool verb, bool fsrf, const modeling_t *m)
+{
+  int nbd = m->nb;
+  sf_axis az = sf_maxa(m->n1 - 2 * m->nb, m->o1 + nbd * m->d1, m->d1);
+  sf_axis ax = sf_maxa(m->n2 - 2 * m->nb, m->o2 + nbd * m->d2, m->d2);
+  sf_axis ay = sf_maxa(m->n3 - 2 * m->nb, m->o3 + nbd * m->d3, m->d3);
+
+  return fdutil3d_init(verb,fsrf,az,ax,ay,nbd,1);
+}
+
 int main(int argc, char** argv)
 {
 
@@ -120,8 +130,15 @@ int main(int argc, char** argv)
 
   if(verb && fsrf) sf_warning("free surface condition");
 
-  as = sf_iaxa(file_src,2); sf_setlabel(as,"s"); if(verb) sf_raxa(as); /* sources */
-  ar = sf_iaxa(file_rec,2); sf_setlabel(ar,"r"); if(verb) sf_raxa(ar); /* receivers */
+  sf_axis asz, asx, asy;
+  asz = sf_iaxa(file_src, 2); asx = sf_iaxa(file_src, 3); asy = sf_iaxa(file_src, 4);
+  as = sf_maxa(sf_n(asz) * sf_n(asx) * sf_n(asy), sf_d(asx), sf_o(asx));
+  /*as = sf_iaxa(file_src,2); sf_setlabel(as,"s"); if(verb) sf_raxa(as); [> sources <]*/
+
+  sf_axis arz, arx, ary;
+  arz = sf_iaxa(file_rec, 2); arx = sf_iaxa(file_rec, 3); ary = sf_iaxa(file_rec, 4);
+  ar = sf_maxa(sf_n(arz) * sf_n(arx) * sf_n(ary), sf_d(arx), sf_o(arx));
+  /*ar = sf_iaxa(file_rec,2); sf_setlabel(ar,"r"); if(verb) sf_raxa(ar); [> receivers <]*/
 
   nt = sf_n(at); dt = sf_d(at);
   nz = sf_n(az); dz = sf_d(az); oz = sf_o(az);
@@ -180,6 +197,69 @@ int main(int argc, char** argv)
   if (!sf_getint("nb",&nbd) || nbd<nop)  nbd=nop;
   if (dabc && hybrid && nbd<=nop) nbd = 2*nop;
 
+  sf_warning("begin conghui's code");
+  int   timeblocks;
+  float vmin;
+  float vmax;
+  float dmin;
+  float dmax;
+  float maxf; // maximum frequency
+  int   nb; // boundary
+  float   error;
+  float errorfact;
+  float qfact;
+  float downfact;
+  float w0; // for velocity
+
+  if (!sf_getint("timeblocks", &timeblocks)) timeblocks = 40;
+  if (!sf_getfloat("maxf", &maxf)) maxf = 80;
+  if (!sf_getfloat("error", &error)) error = 20; // unit: km, fortran unit: m
+  if (!sf_getfloat("errorfact", &errorfact)) errorfact = 1.2;
+  if (!sf_getfloat("downfact", &downfact)) downfact = 0.04;
+  if (!sf_getfloat("qfact", &qfact)) qfact = 50; // copy from vel_mod.f90
+  if (!sf_getfloat("w0", &w0)) w0 = 60;
+
+  nb = nbd;
+
+  float ***v0 = sf_floatalloc3(nz, nx, ny);
+  sf_seek(file_vel, 0, SEEK_SET);
+  sf_floatread(v0[0][0], nx*ny*nz, file_vel);
+  vel_t *vv0 = clone_vel(v0, nz, nx, ny, oz, ox, oy, dz, dx, dy, w0, qfact);
+  vmin_vmax_dmin_dmax(vv0, &vmin, &vmax, &dmin, &dmax);
+
+  sf_warning("vmin: %f, vmax: %f, dmin: %f, dmax: %f", vmin, vmax, dmin, dmax);
+  times_t *times = read_times();
+  init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact);
+
+  /* source and receiver position */
+  src3d = pt3dalloc1(ns);
+  rec3d = pt3dalloc1(nr);
+  pt3dread1(file_src,src3d,ns,3);  /* read format: (x,y,z) */
+  pt3dread1(file_rec,rec3d,nr,3);  /* read format: (x,y,z) */
+
+  box_t *domain = calc_shot_box(vv0, times, src3d, rec3d, nr, nt, dt);
+
+  init_sinc_table(8, 10000);
+  vel_t *vuse = clone_vel(v0, nz, nx, ny, oz, ox, oy, dz, dx, dy, w0, qfact);
+  modeling_t initmodel = make_modeling(vv0);
+
+  for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
+    sf_warning("FORWARD BLOCK: %d", iblock);
+    modeling_t *cur = &domain->hyper[iblock];
+
+    fdm = mkfdm(verb, fsrf, cur);
+
+    /*sf_warning("nzpad, nxpad, nypad", */
+    resample_vel(&initmodel, cur, vv0, vuse);
+    /*resample_p(&*/
+    /*write3df("vb0.rsf", vuse->dat, cur->n1, cur->n2, cur->n3);*/
+    break;
+  }
+
+
+  /*exit(0);*/
+
+
   /* expand domain for FD operators and ABC */
   fdm = fdutil3d_init(verb,fsrf,az,ax,ay,nbd,1);
 
@@ -200,30 +280,19 @@ int main(int argc, char** argv)
   vel = sf_floatalloc3(nzpad,nxpad,nypad);
   if (!cden) rho = sf_floatalloc3(nzpad,nxpad,nypad);
   u_dat = sf_floatalloc(nr);
-  src3d = pt3dalloc1(ns);
-  rec3d = pt3dalloc1(nr);
   if (snap) oslice = sf_floatalloc2(sf_n(acz),sf_n(acx));
 
-  /* source and receiver position */
-  pt3dread1(file_src,src3d,ns,3);  /* read format: (x,y,z) */
   if (sinc) cssinc = sinc3d_make(ns,src3d,fdm);
   else      cslint = lint3d_make(ns,src3d,fdm);
 
-  sf_warning("read receiver locations");
-  sf_warning("nr: %d", nr);
-  pt3dread1(file_rec,rec3d,nr,3);  /* read format: (x,y,z) */
-  sf_warning("end reading receiver");
   if (sinc) crsinc = sinc3d_make(nr,rec3d,fdm);
   else      crlint = lint3d_make(nr,rec3d,fdm);
-
-  /*for (int i = 0; i < nr; i++) {*/
-    /*sf_warning("rx: %f", rec3d[i].x);*/
-  /*}*/
 
   /* temperary array */
   tmp_array = sf_floatalloc3(nz,nx,ny);
 
   /* read velocity and pad */
+  sf_seek(file_vel, 0, SEEK_SET);
   sf_floatread(tmp_array[0][0],nz*nx*ny,file_vel);
   expand3d(tmp_array,vel,fdm);
   /* read density and pad */
@@ -261,6 +330,8 @@ int main(int argc, char** argv)
         memset(vel[iy][ix],0,sizeof(float)*(fdm->nb+1));
   }
 
+  sf_warning("ns: %d, nr: %d", ns, nr);
+  sf_warning("run only one shot");
   /////////////////////// add code here //////////////////
   /*sf_warning("test interpolation");*/
   /*vel_t *oldv = read_vel("v0");*/
@@ -279,58 +350,9 @@ int main(int argc, char** argv)
 
   /*exit(0);*/
 
-  sf_warning("begin conghui's code");
-  int   timeblocks;
-  float vmin;
-  float vmax;
-  float dmin;
-  float dmax;
-  float maxf; // maximum frequency
-  int   nb; // boundary
-  float   error;
-  float errorfact;
-  float qfact;
-  float downfact;
-  float w0; // for velocity
 
-  if (!sf_getint("timeblocks", &timeblocks)) timeblocks = 40;
-  if (!sf_getfloat("maxf", &maxf)) maxf = 80;
-  if (!sf_getfloat("error", &error)) error = 20; // unit: km, fortran unit: m
-  if (!sf_getfloat("errorfact", &errorfact)) errorfact = 1.2;
-  if (!sf_getfloat("downfact", &downfact)) downfact = 0.04;
-  if (!sf_getfloat("qfact", &qfact)) qfact = 50; // copy from vel_mod.f90
-  if (!sf_getfloat("w0", &w0)) w0 = 60;
-
-  nb = nbd;
-
-  float ***v0 = sf_floatalloc3(nz, nx, ny);
-  sf_seek(file_vel, 0, SEEK_SET);
-  sf_floatread(v0[0][0], nx*ny*nz, file_vel);
-  vel_t *vv0 = clone_vel(v0, nz, nx, ny, oz, ox, oy, dz, dx, dy, w0, qfact);
-  vmin_vmax_dmin_dmax(vv0, &vmin, &vmax, &dmin, &dmax);
-
-  sf_warning("vmin: %f, vmax: %f, dmin: %f, dmax: %f", vmin, vmax, dmin, dmax);
-  times_t *times = read_times();
-  init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact);
-
-  box_t *domain = calc_shot_box(vv0, times, src3d, rec3d, nr, nt, dt);
-
-  init_sinc_table(8, 10000);
-  vel_t *vuse = clone_vel(v0, nz, nx, ny, oz, ox, oy, dz, dx, dy, w0, qfact);
-  modeling_t initmodel = make_modeling(vv0);
-
-  for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
-    sf_warning("FORWARD BLOCK: %d", iblock);
-    modeling_t *cur = &domain->hyper[iblock];
-
-    resample_vel(&initmodel, cur, vv0, vuse);
-    /*resample_p(&*/
-    write3df("vb0.rsf", vuse->dat, cur->n1, cur->n2, cur->n3); 
-    break;
-  }
-
-  sf_warning("program exit before loop");
-  exit(0);
+  /*sf_warning("program exit before loop");*/
+  /*exit(0);*/
 
   for (it=0; it<nt; it++) {
     if (verb)  sf_warning("it=%d;",it+1);

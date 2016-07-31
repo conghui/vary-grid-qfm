@@ -158,7 +158,10 @@ main(int argc, char** argv)
 
     if(verb && fsrf) sf_warning("free surface condition");
 
-  as = sf_iaxa(file_src,2); sf_setlabel(as,"s"); if(verb) sf_raxa(as); /* sources */
+  sf_axis asz, asx, asy;
+  asz = sf_iaxa(file_src, 2); asx = sf_iaxa(file_src, 3); asy = sf_iaxa(file_src, 4);
+  as = sf_maxa(sf_n(asz) * sf_n(asx) * sf_n(asy), sf_d(asx), sf_o(asx));
+  /*as = sf_iaxa(file_src,2); sf_setlabel(as,"s"); if(verb) sf_raxa(as); [> sources <]*/
 
   sf_axis arz, arx, ary;
   arz = sf_iaxa(file_rec, 2); arx = sf_iaxa(file_rec, 3); ary = sf_iaxa(file_rec, 4);
@@ -295,14 +298,7 @@ main(int argc, char** argv)
   }
 
   sf_warning("ns: %d, nr: %d", ns, nr);
-  for (int i = 0; i < ns; i++) {
-    /*sf_warning("(%f, %f, %f): %f", src3d[i].z, src3d[i].x, src3d[i].y, src3d[i].v);*/
-  }
-  /*for (int i = 0; i < nr; i++) {*/
-    /*sf_warning("(%f, %f, %f): %f", rec3d[i].z, rec3d[i].x, rec3d[i].y, rec3d[i].v);*/
-  /*}*/
-  /*sf_warning("program call exit()");  exit(0);*/
-
+  sf_warning("run only one shot");
   for (it=0; it<nt; it++) {
     if (verb)  sf_warning("it=%d;",it+1);
 #if defined _OPENMP && _DEBUG

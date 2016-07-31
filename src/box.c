@@ -204,6 +204,7 @@ box_t *calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, 
   memcpy(minT[0][0], times->val[i5][i4][0][0],
       sizeof(float) * times->n1 * times->n2 * times->n3);
 
+  sf_warning("say hello at: %s: %d", __FILE__, __LINE__);
   for (int i = 0; i < nr; i++) {
     int i5 = fminf(fmaxf(round((rec3d[i].y - times->o5) / times->d5 + 0.5), 0), times->n5);
     int i4 = fminf(fmaxf(round((rec3d[i].x - times->o4) / times->d4 + 0.5), 0), times->n4);
@@ -218,11 +219,12 @@ box_t *calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, 
     }
   }
 
-  sf_file file_minT = sf_output("minT");
-  sf_putint(file_minT, "n1", times->n1);
-  sf_putint(file_minT, "n2", times->n2);
-  sf_putint(file_minT, "n3", times->n3);
-  sf_floatwrite(minT[0][0], times->n1 * times->n2 * times->n3, file_minT);
+  sf_warning("say hello at: %s: %d", __FILE__, __LINE__);
+  /*sf_file file_minT = sf_output("minT.rsf");*/
+  /*sf_putint(file_minT, "n1", times->n1);*/
+  /*sf_putint(file_minT, "n2", times->n2);*/
+  /*sf_putint(file_minT, "n3", times->n3);*/
+  /*sf_floatwrite(minT[0][0], times->n1 * times->n2 * times->n3, file_minT);*/
 
   box_t *domain = malloc(sizeof *domain);
   int timeblocks = gs_timeblocks; // global variable
@@ -238,12 +240,14 @@ box_t *calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, 
   float totalsmallcells = 0;
 
   for (int i = 0; i < timeblocks; i++) {
+    sf_warning("time block: %d, creating modeling", i+1);
     domain->hyper[i].nb = gs_nb;
     float timemin = i * blocktime;
     float timemax = timemin + blocktime;
 
-  create_modeling(&domain->hyper[i], vel, times, minT, gs_vmin, gs_vmax, gs_dmax, gs_maxf, timemin, timemax, gs_qfact, gs_downfact, gs_errorfact, gs_error, &totallargecells, &totalsmallcells);
+    create_modeling(&domain->hyper[i], vel, times, minT, gs_vmin, gs_vmax, gs_dmax, gs_maxf, timemin, timemax, gs_qfact, gs_downfact, gs_errorfact, gs_error, &totallargecells, &totalsmallcells);
 
+  sf_warning("\n");
   }
 
   float totalspeedup = totallargecells / totalsmallcells;
