@@ -4,6 +4,7 @@
 #include "step-forward.h"
 #include "box.h"
 #include "vel.h"
+#include "resample.h"
 
 int main(int argc, char** argv)
 {
@@ -260,6 +261,23 @@ int main(int argc, char** argv)
   }
 
   /////////////////////// add code here //////////////////
+  sf_warning("test interpolation");
+  vel_t *oldv = read_vel("v0");
+  vel_t *newv = read_vel("v1");
+  modeling_t olds = make_modeling(oldv);
+  modeling_t news = make_modeling(newv);
+
+  init_sinc_table(8, 10000);
+  interpfield(&olds, &news, oldv->dat, newv->dat, true);
+
+  sf_file fv2 = sf_output("v2");
+  sf_putint(fv2, "n1", newv->n1); sf_putfloat(fv2, "o1", newv->o1); sf_putfloat(fv2, "d1", newv->d1);
+  sf_putint(fv2, "n2", newv->n2); sf_putfloat(fv2, "o2", newv->o2); sf_putfloat(fv2, "d2", newv->d2);
+  sf_putint(fv2, "n3", newv->n3); sf_putfloat(fv2, "o3", newv->o3); sf_putfloat(fv2, "d3", newv->d3);
+  sf_floatwrite(newv->dat[0][0], newv->n1*newv->n2*newv->n3, fv2);
+
+  exit(0);
+
   sf_warning("begin conghui's code");
   int   timeblocks;
   float vmin;

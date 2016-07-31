@@ -3,6 +3,7 @@
 
 #include <rsf.h>
 #include "vel.h"
+#include "model.h"
 
 typedef struct {
   int n1, n2, n3, n4, n5;
@@ -12,14 +13,6 @@ typedef struct {
   float *****val;
 } times_t;
 
-typedef struct {
-  int n1, n2, n3;   // extended size
-  float o1, o2, o3; // extended region
-  float d1, d2, d3;
-  int nb;
-  float dt, dtextra;
-  int ntblock;
-} modeling_t;
 
 typedef struct  {
   int nt;

@@ -60,7 +60,7 @@ Flow(['dd-3d', 'ww-3d', 'minT'],['wav', 'vel-3d','ss-3d', 'rr-3d', 'times'],
             verb=y free=n snap=%(snap)s jsnap=%(jsnap)d jdata=%(jdata)d
             nb=%(nb)d dabc=%(dabc)s timeblocks=20
             vel=${SOURCES[1]} sou=${SOURCES[2]} rec=${SOURCES[3]} wfl=${TARGETS[1]}
-            times=${SOURCES[4]} minT=${TARGETS[2]}
+            times=${SOURCES[4]} minT=${TARGETS[2]} v0=0.rsf v1=1.rsf v2=2.rsf
     ''' % par)
 
 End()

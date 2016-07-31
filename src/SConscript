@@ -11,6 +11,8 @@ step-forward.c
 common.c
 box.c
 vel.c
+resample.c
+check.c
           """.split()
 
 include_dir = [

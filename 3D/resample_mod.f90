@@ -1,6 +1,7 @@
 module resample_mod
   use modeling_mod
   use sinc_mod
+  use sep
   implicit none
   real, allocatable :: sinc_table(:,:)
   integer,private :: ns
@@ -16,8 +17,48 @@ contains
     allocate(sinc_table(nsinc,npts))
     ns=nsinc
     call mksinc_table(npts,nsinc,sinc_table)
+
+    i = sep_put_data_axis_par("sinc.H", 1, nsinc, 0., 0.,'nsinc')
+    i = sep_put_data_axis_par("sinc.H", 2, npts, 0., 0.,'npts')
+    i = srite("sinc.H", sinc_table, size(sinc_table)*4)
+
   end subroutine
 
+  function floatsum2d(matrix) result(s)
+    real :: matrix(:,:)
+    real :: s
+    integer :: i1, i2
+
+    s = 0
+    do i2 = 1, size(matrix, 2)
+      do i1 = 1, size(matrix, 1)
+        s = s + matrix(i1, i2)
+      end do
+    end do
+
+  end function floatsum2d
+
+  subroutine write1di(file, dat, n1)
+    character(len=*) :: file
+    integer :: dat(:)
+    integer :: n1, ierr
+
+    ierr = sep_put_data_axis_par(file, 1, n1, 0.0, 0.0, '1')
+    ierr = sep_put_data_axis_par(file, 2, 1, 0.0, 0.0, '2')
+    ierr = srite(file, dat, size(dat) * 4)
+
+  end subroutine
+
+  subroutine write2di(file, dat, n1, n2)
+    character(len=*) :: file
+    integer :: dat(:,:)
+    integer :: n1, n2, ierr
+
+    ierr = sep_put_data_axis_par(file, 1, n1, 0.0, 0.0, '1')
+    ierr = sep_put_data_axis_par(file, 2, n2, 0.0, 0.0, '2')
+    ierr = srite(file, dat, size(dat)*4)
+
+  end subroutine
 
   subroutine interpField(oldS,newS,oldF,newF,extend)
     logical :: extend
@@ -50,6 +91,11 @@ contains
       if(x1(i1) < oldS%n1+.001 .and. i1 > e1) e1=i1
     end do
 
+    write(0,*) 'b1,b2,b3', b1, b2, b3
+    write(0,*) 'e1,e2,e3', e1, e2, e3
+    !write(0,*) 'x3', x3(:)
+
+    !call exit()
     allocate(k1(newS%n1),k2(newS%n2),k3(newS%n3))
     !!write(0,*) "OLD 1",oldS%n1,oldS%o1,oldS%d1
     !write(0,*) "NEW 1",newS%n1,newS%o1,newS%d1
@@ -107,6 +153,8 @@ contains
       t2=nint((x2-k2)*size(sinc_table,2))+1
       t3=nint((x3-k3)*size(sinc_table,2))+1
 
+
+
       where(t3 > size(sinc_table, 2))
         t3 = size(sinc_table, 2)
       end where
@@ -117,11 +165,17 @@ contains
         t1=size(sinc_table,2)
       end where
 
+
+      write(0,*) 'sumk1, sumk2,  sumk3', sum(k1), sum(k2), sum(k3)
+      write(0,*) 'sumt1, sumt2,  sumt3', sum(t1), sum(t2), sum(t3)
+
       do i1=1,ns
         c1(i1,:)=k1-4+i1
         c2(i1,:)=k2-4+i1
         c3(i1,:)=k3-4+i1
       end do
+
+
       where(c1 <1)
         c1=1
       end where
@@ -141,6 +195,13 @@ contains
         c3=oldS%n3
       end where
 
+      write(0,*) 'c1(:,1)', c1(:,1)
+      call write2di('c1.H', c1, ns, news%n1)
+      call write1di('t1.H', t1, news%n1)
+      !call exit()
+      !call exit()
+      !call exit()
+
       if(extend) then
         !$OMP PARALLEL DO private(i1,i2,i3, ic, ib,ia)
         do i3=1,size(newF,3)
@@ -152,6 +213,8 @@ contains
                     newF(i1,i2,i3)=newF(i1,i2,i3)+&
                       oldF(c1(ia,i1),c2(ib,i2),c3(ic,i3))*&
                       sinc_table(ia,t1(i1))*sinc_table(ib,t2(i2))*sinc_table(ic,t3(i3))
+
+                    !write(0,*) 'c3(',ic,i3,')',c3(ic,i3)
                   end do
                 end do
               end do

@@ -27,7 +27,7 @@ program RTM_FAST
   bigVel%dat = 0
   call init_sinc_table(8, 10000)
 
-  call interpField(small, full, vel%dat, bigVel%dat, .false.)
+  call interpField(small, full, vel%dat, bigVel%dat, .true.)
 
   ii = sep_put_data_axis_par('c.H', 1, full%n1, full%o1, full%d1, "Z")
   ii = sep_put_data_axis_par('c.H', 2, full%n2, full%o2, full%d2, "X")

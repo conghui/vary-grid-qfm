@@ -6,6 +6,38 @@ static float gs_w0;
 static float gs_qfact;
 static float gs_gamma;
 
+modeling_t make_modeling(const vel_t *v)
+{
+  modeling_t m;
+  m.n1 = v->n1; m.o1 = v->o1; m.d1 = v->d1;
+  m.n2 = v->n2; m.o2 = v->o2; m.d2 = v->d2;
+  m.n3 = v->n3; m.o3 = v->o3; m.d3 = v->d3;
+
+  return m;
+}
+
+vel_t *read_vel(const char *tag)
+{
+  sf_file fvel = sf_input(tag);
+  sf_seek(fvel, 0, SEEK_SET);
+
+  vel_t *v = malloc(sizeof *v);
+  sf_histint(fvel, "n1", &v->n1);
+  sf_histint(fvel, "n2", &v->n2);
+  sf_histint(fvel, "n3", &v->n3);
+  sf_histfloat(fvel, "o1", &v->o1);
+  sf_histfloat(fvel, "o2", &v->o2);
+  sf_histfloat(fvel, "o3", &v->o3);
+  sf_histfloat(fvel, "d1", &v->d1);
+  sf_histfloat(fvel, "d2", &v->d2);
+  sf_histfloat(fvel, "d3", &v->d3);
+
+  v->dat = sf_floatalloc3(v->n1, v->n2, v->n3);
+  sf_floatread(v->dat[0][0], v->n1 * v->n2 * v->n3, fvel);
+
+  return v;
+}
+
 vel_t *clone_vel(float ***vel, int nz, int nx, int ny,
     float oz, float ox, float oy,
     float dz, float dx, float dy,
