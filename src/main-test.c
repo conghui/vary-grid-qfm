@@ -268,7 +268,7 @@ int main(int argc, char** argv)
   modeling_t news = make_modeling(newv);
 
   init_sinc_table(8, 10000);
-  interpfield(&olds, &news, oldv->dat, newv->dat, true);
+  interpfield(&olds, &news, oldv->dat, newv->dat, false);
 
   sf_file fv2 = sf_output("v2");
   sf_putint(fv2, "n1", newv->n1); sf_putfloat(fv2, "o1", newv->o1); sf_putfloat(fv2, "d1", newv->d1);

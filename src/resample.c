@@ -238,7 +238,7 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
 
   updown_cip(c1, ns, news->n1, 0, olds->n1-1);
   updown_cip(c2, ns, news->n2, 0, olds->n2-1);
-  updown_cip(c3, ns, news->n2, 0, olds->n2-1);
+  updown_cip(c3, ns, news->n3, 0, olds->n3-1);
 
   for (int i = 0; i < ns; i++) {
     sf_warning("c1[0][%d]: %d", i, c1[0][i]);
@@ -252,7 +252,7 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
   /*exit(0);*/
 
   if (extend) {
-    sf_warning("computation of interpolation");
+    sf_warning("computation of interpolation with extend = true");
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -264,15 +264,9 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
               for (int ia = 0; ia < ns; ia++) {
                 newf[i3][i2][i1] +=
                   oldf[c3[i3][ic]][c2[i2][ib]][c1[i1][ia]] *
-                  gs_sinc_table[t1[i1]][ia] ;
-                  /*gs_sinc_table[t2[i2]][ib] **/
-                  /*gs_sinc_table[t3[i3]][ic];*/
-
-                /*newf[i3][i2][i1] +=*/
-                  /*oldf[c3[i3][ic]][c2[i2][ib]][c1[i1][ia]] **/
-                  /*gs_sinc_table[t1[i1]][ia] **/
-                  /*gs_sinc_table[t2[i2]][ib] **/
-                  /*gs_sinc_table[t3[i3]][ic];*/
+                  gs_sinc_table[t1[i1]][ia] *
+                  gs_sinc_table[t2[i2]][ib] *
+                  gs_sinc_table[t3[i3]][ic];
               }
             }
           }
@@ -280,6 +274,27 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
       }
     }
   } else {
+    sf_warning("computation of interpolation without extend");
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int i3 = b3; i3 <= e3; i3++) {
+      for (int i2 = b2; i2 <= e2; i2++) {
+        for (int i1 = b1; i1 <= e1; i1++) {
+          for (int ic = 0; ic < ns; ic++) {
+            for (int ib = 0; ib < ns; ib++) {
+              for (int ia = 0; ia < ns; ia++) {
+                newf[i3][i2][i1] +=
+                  oldf[c3[i3][ic]][c2[i2][ib]][c1[i1][ia]] *
+                  gs_sinc_table[t1[i1]][ia] *
+                  gs_sinc_table[t2[i2]][ib] *
+                  gs_sinc_table[t3[i3]][ic];
+              }
+            }
+          }
+        }
+      }
+    }
 
   }
   free(x1); free(x2); free(x3);
