@@ -53,7 +53,7 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
   for (int i = 0; i < 3; i++) {
     sf_warning("ns[%d]: %d, os[%d]: %f, ds[%d]: %f", i, ns[i], i, os[i], i, ds[i]);
   }
-  sf_warning("timemax: %f", timemax);
+  sf_warning("timemin: %f, timemax: %f", timemin, timemax);
 
   find_exts(ns, os, ds, minT, timemax, mymin, mymax);
 
@@ -67,9 +67,9 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
     float ff = 1.0 - 2.0 * SF_PI / qfact;
     float cycleskill = log(downfact) / log(ff);
     float fkill = cycleskill / fmaxf(timemin, 0.001);
-    /*dsamp = fmax(dmax, vmin/fminf(maxf, fkill) / 3.3 / errorfact);*/
+    dsamp = fmax(dmax, vmin/fminf(maxf, fkill) / 3.3 / errorfact);
     /// if your unit is: km/s, then divide by 1000
-    dsamp = fmax(dmax, vmin/fminf(maxf, fkill) / 3.3 / errorfact / 1000);
+    /*dsamp = fmax(dmax, vmin/fminf(maxf, fkill) / 3.3 / errorfact / 1000);*/
   } else {
     sf_warning("direct set __dsamp to dmax");
     dsamp = dmax;
@@ -116,7 +116,7 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
 
   float dtmax = 0.49 * dsamp / vmax;
   mod->dt = calgoodsampling(dtmax);
-  mod->dt = 0.004; // TODO: update dt
+  mod->dt = 0.002; // TODO: update dt
   mod->ntblock = (timemax - timemin) / mod->dt;
   mod->dtextra = (timemax - timemin) - mod->dt * mod->ntblock;
 

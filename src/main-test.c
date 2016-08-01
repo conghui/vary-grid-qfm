@@ -1,4 +1,5 @@
 #include <rsf.h>
+#include <assert.h>
 #include "fdutil.h"
 #include "common.h"
 #include "step-forward.h"
@@ -213,7 +214,7 @@ int main(int argc, char** argv)
 
   if (!sf_getint("timeblocks", &timeblocks)) timeblocks = 40;
   if (!sf_getfloat("maxf", &maxf)) maxf = 80;
-  if (!sf_getfloat("error", &error)) error = 20; // unit: km, fortran unit: m
+  if (!sf_getfloat("error", &error)) error = 20;
   if (!sf_getfloat("errorfact", &errorfact)) errorfact = 1.2;
   if (!sf_getfloat("downfact", &downfact)) downfact = 0.04;
   if (!sf_getfloat("qfact", &qfact)) qfact = 50; // copy from vel_mod.f90
@@ -243,21 +244,165 @@ int main(int argc, char** argv)
   vel_t *vuse = clone_vel(v0, nz, nx, ny, oz, ox, oy, dz, dx, dy, w0, qfact);
   modeling_t initmodel = make_modeling(vv0);
 
+  /// preparations
+  /*[> expand domain for FD operators and ABC <]*/
+  fdm = fdutil3d_init(verb,fsrf,az,ax,ay,nbd,1);
+  /* Precompute coefficients */
+  dt2 = dt*dt;
+
+  fdcoef_d2 = compute_fdcoef(nop,dz,dx,dy,optfd,SECOND_DERIV);
+  fdcoef_d1 = compute_fdcoef(nop,dz,dx,dy,optfd,FIRST_DERIV);
+
+  /*Allocate memories*/
+  if (expl) ws = sf_floatalloc(1);
+  else      ws = sf_floatalloc(ns);
+
+  if (snap) oslice = sf_floatalloc2(sf_n(acz),sf_n(acx));
+
+
+  modeling_t *old = &domain->hyper[0];
+  nzpad = old->n1; nxpad = old->n2; nypad = old->n3;
+
+  //[> allocate memory for wavefield variables <]
+  u0 = sf_floatalloc3(nzpad,nxpad,nypad);
+  u1 = sf_floatalloc3(nzpad,nxpad,nypad);
+
+  //[> initialize variables <]
+  memset(u0[0][0],0,sizeof(float)*nzpad*nxpad*nypad);
+  memset(u1[0][0],0,sizeof(float)*nzpad*nxpad*nypad);
+
   for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
     sf_warning("FORWARD BLOCK: %d", iblock);
     modeling_t *cur = &domain->hyper[iblock];
 
     fdm = mkfdm(verb, fsrf, cur);
 
-    /*sf_warning("nzpad, nxpad, nypad", */
+    /*sf_warning("nzpad, nxpad, nypad: %d, %d, %d", fdm->nzpad, fdm->nxpad, fdm->nypad);*/
+    sf_setn(az,fdm->nzpad); sf_seto(az,fdm->ozpad); sf_setd(az, fdm->dz); if (verb) sf_raxa(az);
+    sf_setn(ax,fdm->nxpad); sf_seto(ax,fdm->oxpad); sf_setd(ax, fdm->dx); if (verb) sf_raxa(ax);
+    sf_setn(ay,fdm->nypad); sf_seto(ay,fdm->oypad); sf_setd(ay, fdm->dy); if (verb) sf_raxa(ay);
+
+    nzpad = fdm->nzpad; nxpad = fdm->nxpad; nypad = fdm->nypad;
+    nz = fdm->nz; nx = fdm->nx; ny = fdm->ny;
+
     resample_vel(&initmodel, cur, vv0, vuse);
+    sf_warning("say hello: %s:%d", __FILE__, __LINE__);
+
+    /// set pointer
+    vel = vuse->dat;
+
+    /* A1 one-way ABC implicit scheme coefficients  */
+    if (dabc) {
+      abc = abcone3d_make(nbd,dt,vel,fsrf,fdm);
+      if (hybrid)
+        damp = damp_make(nbd-nop); /* compute damping profiles for hybrid bc */
+      else
+        spo = sponge_make(fdm->nb);
+    }
+    sf_warning("say hello: %s:%d", __FILE__, __LINE__);
+
+    if (sinc) cssinc = sinc3d_make(ns,src3d,fdm);
+    else      cslint = lint3d_make(ns,src3d,fdm);
+    sf_warning("say hello: %s:%d", __FILE__, __LINE__);
+
+    /* v = (v*dt)^2 */
+    for (ix=0;ix<nzpad*nxpad*nypad;ix++)
+      *(vel[0][0]+ix) *= *(vel[0][0]+ix)*dt2;
+    if (fsrf && !hybrid) {
+      for (iy=0; iy<nypad; iy++)
+        for (ix=0; ix<nxpad; ix++)
+          memset(vel[iy][ix],0,sizeof(float)*(fdm->nb+1));
+    }
+
+    resample_p(old, cur, &u0);
+    resample_p(old, cur, &u1);
+    old = cur;
+
+    sf_warning("ntblock: %d\n", cur->ntblock);
+
+    assert(fabs(dt - cur->dt) < 0.00001);
+
+    for (it=0; it<cur->ntblock; it++) {
+      if (verb)  sf_warning("it=%d;",it+1);
+#if defined _OPENMP && _DEBUG
+      tic=omp_get_wtime();
+#endif
+
+      step_forward(u0,u1,vel,rho,fdcoef_d2,fdcoef_d1,nop,nzpad,nxpad,nypad);
+
+      if (adj) { /* backward inject source wavelet */
+        if (expl) {
+          sf_seek(file_wav,(off_t)(nt-it-1)*sizeof(float),SEEK_SET);
+          sf_floatread(ws,1,file_wav);
+          if (sinc) sinc3d_inject1_with_vv(u0,ws[0],cssinc,vel);
+          else      lint3d_inject1_with_vv(u0,ws[0],cslint,vel);
+        } else {
+          sf_seek(file_wav,(off_t)(nt-it-1)*ns*sizeof(float),SEEK_SET);
+          sf_floatread(ws,ns,file_wav);
+          if (sinc) sinc3d_inject_with_vv(u0,ws,cssinc,vel);
+          else      lint3d_inject_with_vv(u0,ws,cslint,vel);
+        }
+      } else { /* forward inject source wavelet */
+        if (expl) {
+          sf_floatread(ws,1,file_wav);
+          if (sinc) sinc3d_inject1_with_vv(u0,ws[0],cssinc,vel);
+          else      lint3d_inject1_with_vv(u0,ws[0],cslint,vel);
+        } else {
+          sf_floatread(ws,ns,file_wav);
+          if (sinc) sinc3d_inject_with_vv(u0,ws,cssinc,vel);
+          else      lint3d_inject_with_vv(u0,ws,cslint,vel);
+        }
+      }
+
+      /* apply abc */
+      if (dabc) {
+        if (hybrid) apply_abc(u0,u1,nz,nx,ny,nbd,abc,nop,damp);
+        else {
+          abcone3d_apply(u0,u1,nop,abc,fdm);
+          sponge3d_apply(u0,spo,fdm);
+          sponge3d_apply(u1,spo,fdm);
+        }
+      }
+
+      /* loop over pointers */
+      ptr_tmp = u0;  u0 = u1;  u1 = ptr_tmp;
+
+      /* extract snapshot */
+      if (snap && it%jsnap==0) {
+        /*int fy = (floor)((sf_o(acy)-fdm->oypad)/fdm->dy);*/
+        /*int jy = floor(sf_d(acy)/fdm->dy);*/
+        /*float **ptr_slice;*/
+        /*for (iy=0; iy<sf_n(acy); iy++) {*/
+          /*ptr_slice = u0[fy+iy*jy];*/
+          /*cut3d_slice(ptr_slice,oslice,fdm,acz,acx);*/
+          /*sf_floatwrite(oslice[0],sf_n(acz)*sf_n(acx),file_wfl);*/
+        /*}*/
+        float ***tmp = sf_floatalloc3(nzpad, nxpad, nypad);
+        memcpy(tmp[0][0], u0[0][0], nzpad*nxpad*nypad*sizeof(float));
+        resample_p(cur, &initmodel, &tmp);
+        sf_floatwrite(tmp[0][0], initmodel.n1 * initmodel.n2 * initmodel.n3, file_wfl);
+        free(**tmp); free(*tmp); free(tmp);
+      }
+
+      /* extract receiver data */
+      /*if (sinc) sinc3d_extract(u0,u_dat,crsinc);*/
+      /*else      lint3d_extract(u0,u_dat,crlint);*/
+
+      /*sf_floatwrite(u_dat,nr,file_dat);*/
+
+#if defined _OPENMP && _DEBUG
+      toc=omp_get_wtime();
+      fprintf(stderr,"%5.2gs",(float)(toc-tic));
+#endif
+    }
     /*resample_p(&*/
     /*write3df("vb0.rsf", vuse->dat, cur->n1, cur->n2, cur->n3);*/
-    break;
+    /*break;*/
+
   }
 
 
-  /*exit(0);*/
+  exit(0);
 
 
   /* expand domain for FD operators and ABC */

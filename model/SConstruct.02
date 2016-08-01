@@ -11,22 +11,22 @@ par = {
     'nt':800, 'ot':0, 'dt':0.002, 'lt':'t', 'ut':'s',
 
     # velocity
-    'nz':200, 'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
-    'nx':300, 'ox':0, 'dx':20,  'lx':'x', 'ux':'m',
-    'ny':400, 'oy':0, 'dy':20,  'ly':'y', 'uy':'m',
+    'nz':100, 'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
+    'nx':200, 'ox':0, 'dx':10,  'lx':'x', 'ux':'m',
+    'ny':100, 'oy':0, 'dy':10,  'ly':'y', 'uy':'m',
 
     # receiver location
     'rnz':1,   'roz':0, 'rdz':10,
-    'rnx':100, 'rox':0, 'rdx':20,
-    'rny':2,   'roy':0, 'rdy':20,
+    'rnx':100, 'rox':0, 'rdx':10,
+    'rny':2,   'roy':0, 'rdy':10,
 
     # source location (only support one shot)
-    'sz': 0, 'sx':3000,'sy':4000, # unit: m
+    'sz': 0, 'sx':1000,'sy':500, # unit: m
 
     'kt':80,
     'jsnap':20,
     'nb':10,
-    'frq':20
+    'frq':10
     }
 
 fdmod.param(par)
@@ -83,7 +83,7 @@ Flow('times', 'vel-3d', 'window j1=8 j2=8 j3=8 | ./make_time.x j2=4 j3=4')
 Flow(['dd-3d', 'ww-3d'],['wav', 'vel-3d','ss-3d', 'rr-3d', 'times'],
     '''../../bin/test ompchunk=%(ompchunk)d ompnth=%(ompnth)d cden=y
             verb=y free=n snap=%(snap)s jsnap=%(jsnap)d jdata=%(jdata)d
-            nb=%(nb)d dabc=%(dabc)s fdorder=4 timeblocks=2
+            nb=%(nb)d dabc=%(dabc)s fdorder=4 timeblocks=4
             vel=${SOURCES[1]} sou=${SOURCES[2]} rec=${SOURCES[3]} wfl=${TARGETS[1]}
             times=${SOURCES[4]}
     ''' % par)

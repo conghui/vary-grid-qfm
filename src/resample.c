@@ -197,8 +197,8 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
   x_b_e(olds->n2, olds->o2, olds->d2, news->n2, news->o2, news->d2, x2, &b2, &e2);
   x_b_e(olds->n3, olds->o3, olds->d3, news->n3, news->o3, news->d3, x3, &b3, &e3);
 
-  sf_warning("b1,b2,b3: %d, %d, %d", b1, b2, b3);
-  sf_warning("e1,e2,e3: %d, %d, %d", e1, e2, e3);
+  /*sf_warning("b1,b2,b3: %d, %d, %d", b1, b2, b3);*/
+  /*sf_warning("e1,e2,e3: %d, %d, %d", e1, e2, e3);*/
   /*for (int i = 0; i < news->n3; i++) {*/
     /*sf_warning("%f", x3[i]);*/
   /*}*/
@@ -253,7 +253,7 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
   /*exit(0);*/
 
   if (extend) {
-    sf_warning("computation of interpolation with extend = true");
+    /*sf_warning("computation of interpolation with extend = true");*/
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -275,7 +275,7 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
       }
     }
   } else {
-    sf_warning("computation of interpolation without extend");
+    /*sf_warning("computation of interpolation without extend");*/
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
