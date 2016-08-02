@@ -290,6 +290,7 @@ int main(int argc, char** argv)
 
     /// set pointer
     vel = vuse->dat;
+    float ***vgamma = vuse->vgamma;
 
     /* A1 one-way ABC implicit scheme coefficients  */
     if (dabc) {
@@ -328,7 +329,7 @@ int main(int argc, char** argv)
       tic=omp_get_wtime();
 #endif
 
-      step_forward(u0,u1,vel,rho,fdcoef_d2,fdcoef_d1,nop,nzpad,nxpad,nypad);
+      step_forward_q(u0,u1,vel,vgamma,rho,fdcoef_d2,fdcoef_d1,nop,nzpad,nxpad,nypad);
 
       if (adj) { /* backward inject source wavelet */
         if (expl) {

@@ -54,6 +54,8 @@ vel_t *clone_vel(float ***vel, int nz, int nx, int ny,
 
   gs_w0 = w0; gs_qfact= qfact;
   gs_gamma = 1.0/SF_PI*atan(2*SF_PI/qfact);
+
+  sf_warning("gs_gamma: %f", gs_gamma);
   return v;
 }
 
@@ -82,11 +84,16 @@ void resample_vel(const modeling_t *olds, const modeling_t *news, const vel_t *o
 
   newv->dat = sf_floatalloc3(news->n1, news->n2, news->n3);
   newv->vgamma = sf_floatalloc3(news->n1, news->n2, news->n3);
-  
+
   interpfield(olds, news, oldv->dat, newv->dat, true);
 
-  // TODO: we doesn't set gvamma yet
-
+  for (int i3 = 0; i3 < news->n3; i3++) {
+    for (int i2 = 0; i2 < news->n2; i2++) {
+      for (int i1 = 0; i1 < news->n1; i1++) {
+        newv->vgamma[i3][i2][i1] = -powf(newv->dat[i3][i2][i1],2*gs_gamma-1) * powf(gs_w0, 2 * gs_gamma) * sin(SF_PI * gs_gamma) / news->dt;
+      }
+    }
+  }
 }
 
 void resample_p(const modeling_t *olds, const modeling_t *news, float ****p)

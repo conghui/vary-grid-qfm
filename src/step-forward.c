@@ -213,9 +213,9 @@ void step_forward(float*** restrict u0, float*** restrict u1,
         for (iz=nop; iz<nzpad-nop; iz++) {
           lap = u1[iy][ix][iz]*c0;
           for (iop=1; iop<=nop; iop++) {
-            lap += (u1[iy][ix][iz-iop] + u1[iy][ix][iz+iop]) * cz[iop]
-              + (u1[iy][ix-iop][iz] + u1[iy][ix+iop][iz]) * cx[iop]
-              + (u1[iy-iop][ix][iz] + u1[iy+iop][ix][iz]) * cy[iop];
+            lap +=  (u1[iy][ix][iz-iop] + u1[iy][ix][iz+iop]) * cz[iop]
+                  + (u1[iy][ix-iop][iz] + u1[iy][ix+iop][iz]) * cx[iop]
+                  + (u1[iy-iop][ix][iz] + u1[iy+iop][ix][iz]) * cy[iop];
           }
           if (rho != NULL) { /* variable density term */
             du_z = du_x = du_y = drho_z = drho_x = drho_y = 0.f;
@@ -236,4 +236,40 @@ void step_forward(float*** restrict u0, float*** restrict u1,
     }
 #endif
     return;
+}
+
+void step_forward_q(float*** restrict u0, float*** restrict u1,
+    float*** restrict vel, float *** restrict vgamma, float*** restrict rho,
+    float* restrict fdcoef_d2, float* restrict fdcoef_d1,
+    int nop, int nzpad, int nxpad, int nypad)
+{
+  float c0 = fdcoef_d2[0];
+  float *cz = &fdcoef_d2[0];
+  float *cx = &fdcoef_d2[nop];
+  float *cy = &fdcoef_d2[nop+nop];
+
+  (void)(rho);
+  (void)(fdcoef_d1);
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for (int iy=nop; iy<nypad-nop; iy++) {
+    for (int ix=nop; ix<nxpad-nop; ix++) {
+      for (int iz=nop; iz<nzpad-nop; iz++) {
+        float tau = vgamma[iy][ix][iz];
+        float taucur = 1 - tau;
+        float tauprev = tau;
+        float lap = (taucur*u1[iy][ix][iz] + tauprev*u0[iy][ix][iz])*c0;
+
+        for (int iop=1; iop<=nop; iop++) {
+          lap +=
+              (taucur*(u1[iy][ix][iz-iop] + u1[iy][ix][iz+iop]) + tauprev*(u0[iy][ix][iz-iop] + u0[iy][ix][iz+iop])) * cz[iop]
+            + (taucur*(u1[iy][ix-iop][iz] + u1[iy][ix+iop][iz]) + tauprev*(u0[iy][ix-iop][iz] + u0[iy][ix+iop][iz])) * cx[iop]
+            + (taucur*(u1[iy-iop][ix][iz] + u1[iy+iop][ix][iz]) + tauprev*(u0[iy-iop][ix][iz] + u0[iy+iop][ix][iz])) * cy[iop];
+        }
+        u0[iy][ix][iz] = 2.*u1[iy][ix][iz] - u0[iy][ix][iz] + vel[iy][ix][iz]*lap;
+      }
+    }
+  }
 }
