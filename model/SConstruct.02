@@ -83,7 +83,7 @@ Flow('times', 'vel-3d', 'window j1=8 j2=8 j3=8 | ./make_time.x j2=4 j3=4')
 Flow(['dd-3d', 'ww-3d'],['wav', 'vel-3d','ss-3d', 'rr-3d', 'times'],
     '''../../bin/test ompchunk=%(ompchunk)d ompnth=%(ompnth)d cden=y
             verb=y free=n snap=%(snap)s jsnap=%(jsnap)d jdata=%(jdata)d
-            nb=%(nb)d dabc=%(dabc)s fdorder=4 timeblocks=4
+            nb=%(nb)d dabc=%(dabc)s fdorder=4 timeblocks=4 withq=n
             vel=${SOURCES[1]} sou=${SOURCES[2]} rec=${SOURCES[3]} wfl=${TARGETS[1]}
             times=${SOURCES[4]}
     ''' % par)

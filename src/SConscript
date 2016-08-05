@@ -1,20 +1,14 @@
 import os
 Import('*')
 
-bin_list = [
-("test", "main-test.c"),
-("fd3d", "main-fd3d.c"),
+cuda_bin_list = [
+    ("elastic", "Mewefd3d_gpu_p2p.cu"),
 ]
 
-modules = """
+cuda_module = """
 fdutil.c
-step-forward.c
-common.c
-box.c
-vel.c
-resample.c
-check.c
-          """.split()
+ewefd3d_kernels.cu
+""".split()
 
 include_dir = [
 ]
@@ -22,15 +16,12 @@ include_dir = [
 depend_libpath = []
 depend_libs = []
 
-# clone the environment from global env and make some modification of it
-myenv   = env.Clone(CPPPATH = include_dir)
-myenv.Append(LIBPATH = depend_libpath)
-myenv.Prepend(LIBS = depend_libs)
+mycudaenv = cudaenv.Clone(CPPPATH = include_dir)
+mycudaenv.Append(LIBPATH = depend_libpath)
+mycudaenv.Append(LIBS = depend_libs)
+cudaobjs = mycudaenv.StaticObject(cuda_module)
 
-objs = myenv.StaticObject(modules)
-
-# compile each binary
-for bin in bin_list:
-  bin_obj = myenv.StaticObject(bin[1])
-  bin_target = myenv.Program(target = bin[0], source = bin_obj + objs)
-  myenv.Install("#" + dirs['bin'], bin_target)
+for bin in cuda_bin_list:
+  bin_obj = mycudaenv.StaticObject(bin[1])
+  bin_target = mycudaenv.Program(target = bin[0], source = bin_obj + cudaobjs)
+  mycudaenv.Install("#" + dirs['bin'], bin_target)
