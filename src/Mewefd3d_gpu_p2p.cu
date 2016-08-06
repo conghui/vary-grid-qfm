@@ -153,16 +153,21 @@ int main(int argc, char* argv[]) {
   ax = sf_iaxa(Fccc,2); sf_setlabel(ax,"x"); if(verb) sf_raxa(ax); /* space x */
   ay = sf_iaxa(Fccc,3); sf_setlabel(ay,"y"); if(verb) sf_raxa(ay); /* space y */
 
-  // TODO: change as ar
-  as = sf_iaxa(Fsou,2); sf_setlabel(as,"s"); if(verb) sf_raxa(as); /* sources */
-  ar = sf_iaxa(Frec,2); sf_setlabel(ar,"r"); if(verb) sf_raxa(ar); /* receivers */
+  sf_axis asz, asx, asy;
+  asz = sf_iaxa(Fsou, 2); asx = sf_iaxa(Fsou, 3); asy = sf_iaxa(Fsou, 4);
+  as = sf_maxa(sf_n(asz) * sf_n(asx) * sf_n(asy), sf_d(asx), sf_o(asx));
+  //as = sf_iaxa(Fsou,2); sf_setlabel(as,"s"); if(verb) sf_raxa(as); [> sources <]
+
+  sf_axis arz, arx, ary;
+  arz = sf_iaxa(Frec, 2); arx = sf_iaxa(Frec, 3); ary = sf_iaxa(Frec, 4);
+  ar = sf_maxa(sf_n(arz) * sf_n(arx) * sf_n(ary), sf_d(arx), sf_o(arx));
+  //ar = sf_iaxa(Frec,2); sf_setlabel(ar,"r"); if(verb) sf_raxa(ar); [> receivers <]
 
   nt = sf_n(at); dt = sf_d(at);
   nz = sf_n(az); dz = sf_d(az);
   nx = sf_n(ax); dx = sf_d(ax);
   ny = sf_n(ay); dy = sf_d(ay);
 
-  // TODO:
   ns = sf_n(as);
   nr = sf_n(ar);
 
