@@ -43,6 +43,8 @@
 extern "C" {
 #include <rsf.h>
 #include "fdutil.h"
+#include "vel.h"
+#include "box.h"
 }
 
 #include "ewefd3d_kernels.h"
@@ -1230,6 +1232,40 @@ int main(int argc, char* argv[]) {
 
   float *full_h_ro,  *full_h_c11,  *full_h_c22,  *full_h_c33,  *full_h_c44,  *full_h_c55,  *full_h_c66,  *full_h_c12,  *full_h_c13,  *full_h_c23;
   read_density_velocity(Fden, Fccc, totalfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, nz, nx, ny);
+
+  sf_warning("begin conghui's code");
+  int   timeblocks;
+  float vmin;
+  float vmax;
+  float dmin;
+  float dmax;
+  float maxf; // maximum frequency
+  float   error;
+  float errorfact;
+  float qfact;
+  float downfact;
+  float w0; // for velocity
+  bool withq;
+
+  if (!sf_getint("timeblocks", &timeblocks)) timeblocks = 40;
+  if (!sf_getfloat("maxf", &maxf)) maxf = 80;
+  if (!sf_getfloat("error", &error)) error = 20;
+  if (!sf_getfloat("errorfact", &errorfact)) errorfact = 1.2;
+  if (!sf_getfloat("downfact", &downfact)) downfact = 0.04;
+  if (!sf_getfloat("qfact", &qfact)) qfact = 50; // copy from vel_mod.f90
+  if (!sf_getfloat("w0", &w0)) w0 = 60;
+  if (!sf_getbool("withq", &withq)) withq = false;
+
+  sf_file Fvelp = sf_input("vp"); // p wave velocity
+  float ***v0 = sf_floatalloc3(nz, nx, ny);
+  sf_seek(Fvelp, 0, SEEK_SET);
+  sf_floatread(v0[0][0], nx*ny*nz, Fvelp);
+  vel_t *vv0 = clone_vel(v0, nz, nx, ny, sf_o(az), sf_o(ax), sf_o(ay), sf_d(az), sf_d(ax), sf_d(ay), w0, qfact);
+  vmin_vmax_dmin_dmax(vv0, &vmin, &vmax, &dmin, &dmax);
+
+  sf_warning("vmin: %f, vmax: %f, dmin: %f, dmax: %f", vmin, vmax, dmin, dmax);
+  times_t *times = read_times();
+  init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact);
 
   // TODO: put your code here, update az, ax, zy, nt, dt, then everything is supposed to be fine
   // TODO: you also need to interpolate full_*

@@ -3,10 +3,16 @@ Import('*')
 
 cuda_bin_list = [
     ("elastic", "Mewefd3d_gpu_p2p.cu"),
+    ("maketime", "main-maketime.c"),
 ]
 
 cuda_module = """
 fdutil.c
+vel.c
+box.c
+resample.c
+check.c
+fastmarch.c
 ewefd3d_kernels.cu
 """.split()
 

@@ -147,13 +147,19 @@ for m in ['VTI']:
   Flow(m+'c',[m+'x1',m+'x2',m+'x3',m+'x4',m+'x5',m+'x6'],'cat axis=1 ${SOURCES[1:6]} ')
   Result(m+'c','grey pclip=100 title="" wantaxis=n screenratio=1 allpos=y color=j')
 
+
+# ------------------------------------------------------------
+# make time
+Flow('times', 'vp-3d', 'window j1=8 j2=8 j3=8 | ../../bin/maketime j2=4 j3=4')
+
+
 # ------------------------------------------------------------
 # . . Elastic Modeling Section
 # . . GPU SECTION
 for m in ['VTI']:
 
     # . . Perform 3D modelling
-    Flow([m+'d-3d-GPU',m+'w-3d-GPU'], ['wave-3d',m+'c-3d','ro-3d','ss-3d','rr-3d'],
+    Flow([m+'d-3d-GPU',m+'w-3d-GPU'], ['wave-3d',m+'c-3d','ro-3d','ss-3d','rr-3d', 'vp-3d', 'times'],
         '''
         ../../bin/elastic
         ccc=${SOURCES[1]}
@@ -161,7 +167,9 @@ for m in ['VTI']:
         sou=${SOURCES[3]}
         rec=${SOURCES[4]}
         wfl=${TARGETS[1]}
-              ngpu=2 jdata=%(jdata)d verb=%(verb)s free=n ssou=%(ssou)s
+        vp=${SOURCES[5]}
+        times=${SOURCES[6]}
+        ngpu=2 jdata=%(jdata)d verb=%(verb)s free=n ssou=%(ssou)s
         opot=n snap=%(snap)s jsnap=%(jsnap)d
         dabc=%(dabc)s nb=%(nb)d nbell=%(nbell)d
         ''' %par)
