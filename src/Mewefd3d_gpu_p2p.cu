@@ -169,194 +169,14 @@ static float **init_wavelet(sf_file &Fwav, int ns, int nc, int nt, int ngpu)
   return d_ww;
   /*------------------------------------------------------------*/
 }
-static void check_zx_dim(const fdm3d &fdm, int ngpu)
+static void setup_output_array(float *&h_dd, float *&h_dd_combined, float **&d_dd, int ngpu, int nr, int nc)
 {
-  // check that dimmeionsons are ok for FD kernels
-  if ((fdm->nzpad - 8) % 24 != 0){
-    sf_error("nz + 2*nb - 8 is not a multiple of 24");
-  }
-  if ((fdm->nxpad - 8) % 24 != 0){
-    sf_error("nx + 2*nb - 8 is not a multiple of 24");
-  }
-  if ((fdm->nypad % ngpu) != 0){
-    sf_error("You are using %d GPUs.\n(ny + 2*nb) must me a multiple of %d\nChange model dimensions or select a different number of GPUs", ngpu, ngpu);
-  }
-}
-static void set_nylocal(const fdm3d &fdm, int *nylocal, int ngpu, int nyinterior)
-{
-  // all interior nodes need 8 additional ghost slices (4 on each side of the y axis)
-  for (int g = 0; g < ngpu; g++){
-    nylocal[g] = nyinterior + 8;
-  }
-
-  // exterior nodes only require 4 additional ghost slices
-  if (ngpu >= 2){
-    nylocal[0] = nyinterior + 4;
-    nylocal[ngpu-1] = nyinterior + 4;
-  }
-
-  // if using 1 GPU, this GPU holds the entire domain
-  if (ngpu == 1){
-    nylocal[0] = fdm->nypad;
-  }
-}
-
-// entry point
-int main(int argc, char* argv[]) {
-
-  bool verb,fsrf,snap,ssou,dabc,interp;
-  int  jsnap,jdata;
-
-  /* I/O files */
-  sf_file Fwav=NULL; /* wavelet   */
-  sf_file Fsou=NULL; /* sources   */
-  sf_file Frec=NULL; /* receivers */
-  sf_file Fccc=NULL; /* velocity  */
-  sf_file Fden=NULL; /* density   */
-  sf_file Fdat=NULL; /* data      */
-  sf_file Fwfl=NULL; /* wavefield */
-
-  /* cube axes */
-  sf_axis at,ax,ay,az;
-  sf_axis as,ar;
-
-  int     nt,nz,nx,ny,ns,nr,nb;
-  int     it,iz,ix,iy;
-  float   dt,dz,dx,dy,idz,idx,idy;
-
-  /* FDM structure */
-  fdm3d    fdm=NULL;
-
-  /* I/O arrays */
-  pt3d   *ss=NULL;           /* sources   */
-  pt3d   *rr=NULL;           /* receivers */
-
-
-  /*------------------------------------------------------------*/
-  // used for writing wavefield to file, only needed if snap=y
-  float ***uox, ***uoy, ***uoz;
-  float *h_uox, *h_uoy, *h_uoz;
-  uox = uoy = uoz = NULL;
-  h_uox = h_uoy = h_uoz = NULL;
-
-
-  /*------------------------------------------------------------*/
-  /* linear interpolation weights/indices */
-  lint3d cs,cr;
-
-  /* Gaussian bell */
-  int nbell;
-
-  /* wavefield cut params */
-  float     ***uc=NULL;
-
-  /* init RSF */
-  sf_init(argc,argv);
-
-
-  /*------------------------------------------------------------*/
-  /* init GPU */
-  int ngpu;
-  if (! sf_getint("ngpu", &ngpu)) ngpu = 1; /* how many local GPUs to use */
-  sf_warning("using %d GPUs", ngpu);
-  for (int g = 0; g < ngpu; g++){
-    cudaSetDevice(g);
-    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-  }
-
-
-  /*------------------------------------------------------------*/
-  /* execution flags */
-  if(! sf_getbool("verb",&verb)) verb=false; /* verbosity flag */
-  if(! sf_getbool("snap",&snap)) snap=false; /* wavefield snapshots flag */
-  if(! sf_getbool("free",&fsrf)) fsrf=false; /* free surface flag */
-  if(! sf_getbool("ssou",&ssou)) ssou=false; /* stress source */
-  if(! sf_getbool("dabc",&dabc)) dabc=false; /* absorbing BC */
-  if(! sf_getbool("interp",&interp)) interp=true; /* perform linear interpolation on receiver data */
-
-
-  /*------------------------------------------------------------*/
-  /* I/O files */
-  Fwav = sf_input ("in"); /* wavelet   */
-  Fccc = sf_input ("ccc"); /* stiffness */
-  Fden = sf_input ("den"); /* density   */
-  Fsou = sf_input ("sou"); /* sources   */
-  Frec = sf_input ("rec"); /* receivers */
-  Fwfl = sf_output("wfl"); /* wavefield */
-  Fdat = sf_output("out"); /* data      */
-
-
-  /*------------------------------------------------------------*/
-  /* axes */
-  at = sf_iaxa(Fwav,3); sf_setlabel(at,"t"); if(verb) sf_raxa(at); /* time */
-  az = sf_iaxa(Fccc,1); sf_setlabel(az,"z"); if(verb) sf_raxa(az); /* depth */
-  ax = sf_iaxa(Fccc,2); sf_setlabel(ax,"x"); if(verb) sf_raxa(ax); /* space x */
-  ay = sf_iaxa(Fccc,3); sf_setlabel(ay,"y"); if(verb) sf_raxa(ay); /* space y */
-
-  sf_axis asz, asx, asy;
-  asz = sf_iaxa(Fsou, 2); asx = sf_iaxa(Fsou, 3); asy = sf_iaxa(Fsou, 4);
-  as = sf_maxa(sf_n(asz) * sf_n(asx) * sf_n(asy), sf_d(asx), sf_o(asx));
-
-  sf_axis arz, arx, ary;
-  arz = sf_iaxa(Frec, 2); arx = sf_iaxa(Frec, 3); ary = sf_iaxa(Frec, 4);
-  ar = sf_maxa(sf_n(arz) * sf_n(arx) * sf_n(ary), sf_d(arx), sf_o(arx));
-
-  nt = sf_n(at); dt = sf_d(at);
-  nz = sf_n(az); dz = sf_d(az);
-  nx = sf_n(ax); dx = sf_d(ax);
-  ny = sf_n(ay); dy = sf_d(ay);
-
-  ns = sf_n(as);
-  nr = sf_n(ar);
-
-
-  /*------------------------------------------------------------*/
-  /* other execution parameters */
-  if(! sf_getint("nbell",&nbell)) nbell=5;  /* bell size */
-  if(verb) sf_warning("nbell=%d",nbell);
-  if(! sf_getint("jdata",&jdata)) jdata=1;  /* extract receiver data every jdata time steps */
-  if(snap) {
-    if(! sf_getint("jsnap",&jsnap)) jsnap=nt;  /* save wavefield every jsnap time steps */
-  }
-
-  if( !sf_getint("nb",&nb) || nb<NOP) nb=NOP;
-
-  /*------------------------------------------------------------*/
-  /* 3D vector components */
-  int nc=3;
-  sf_axis ac=sf_maxa(nc  ,0,1);
-  setup_output_data(Fdat, at, ar, ac, nt, jdata, dt);
-
-  float **d_bell = setup_bell(nbell, ngpu);
-  float **d_ww = init_wavelet(Fwav, ns, nc, nt, ngpu);
-
-  sf_axis full_az = sf_maxa(sf_n(az), sf_o(az), sf_d(az));
-  sf_axis full_ax = sf_maxa(sf_n(ax), sf_o(ax), sf_d(ax));
-  sf_axis full_ay = sf_maxa(sf_n(ay), sf_o(ay), sf_d(ay));
-  fdm3d totalfdm=fdutil3d_init(verb,fsrf,full_az,full_ax,full_ay,nb,1);
-  update_axis(totalfdm, full_az, full_ax, full_ay, verb);
-  if (snap)  set_output_wfd(Fwfl, at, full_az, full_ax, full_ay, ac, nt, dt, jsnap, verb);
-
-  /*------------------------------------------------------------*/
-  // TODO: put time block stuff here
-  /* expand domain for FD operators and ABC */
-  fdm=fdutil3d_init(verb,fsrf,az,ax,ay,nb,1);
-  update_axis(fdm, az, ax, ay, verb);
-
-  /*------------------------------------------------------------*/
-  /* compute sub-domain dimmensions (domain decomposition) */
-  int nyinterior = (fdm->nypad / ngpu);   // size of sub-domains in y-dimension EXCLUDING any ghost cells from adjacent GPUs
-  int *nylocal = (int*)malloc(ngpu*sizeof(int));  // size of sub-domains in y-dimension INCLUDING any ghost cells from adjacent GPUs
-  set_nylocal(fdm, nylocal, ngpu, nyinterior);
-  check_zx_dim(fdm, ngpu);
-  if(snap) { alloc_wlf(fdm, uoz, uox, uoy, h_uoz, h_uox, h_uoy, uc, nyinterior); }
-
   /*------------------------------------------------------------*/
   /* data array */
-  float *h_dd = (float*)malloc(nr * nc * sizeof(float));
-  float *h_dd_combined = (float*)malloc(nr * nc * sizeof(float));
+  h_dd = (float*)malloc(nr * nc * sizeof(float));
+  h_dd_combined = (float*)malloc(nr * nc * sizeof(float));
 
-  float **d_dd = (float**)malloc(ngpu*sizeof(float*));
+  d_dd = (float**)malloc(ngpu*sizeof(float*));
   for (int g = 0; g < ngpu; g++){
     cudaSetDevice(g);
     cudaMalloc(&d_dd[g], nr*nc*sizeof(float));
@@ -364,7 +184,9 @@ int main(int argc, char* argv[]) {
   }
   /*------------------------------------------------------------*/
 
-
+}
+static void setup_src_rcv_cord(sf_file &Fsou, sf_file &Frec, pt3d *&ss, pt3d *&rr, int ns, int nr)
+{
   /*------------------------------------------------------------*/
   /* setup source/receiver coordinates */
   ss = (pt3d*) sf_alloc(ns,sizeof(*ss));
@@ -373,16 +195,19 @@ int main(int argc, char* argv[]) {
   pt3dread1(Fsou,ss,ns,3); /* read (x,y,z) coordinates */
   pt3dread1(Frec,rr,nr,3); /* read (x,y,z) coordinates */
 
+}
+static void setup_interp_cooef(float **&d_Sw000, float **&d_Sw001, float **&d_Sw010, float **&d_Sw011, float **&d_Sw100, float **&d_Sw101, float **&d_Sw110, float **&d_Sw111, int **&d_Sjz, int **&d_Sjx, int **&d_Sjy, const fdm3d &fdm, pt3d *ss, int ns, int ngpu)
+{
   /* calculate 3d linear interpolation coefficients for source locations and copy to each GPU*/
-  cs = lint3d_make(ns,ss,fdm);
-  float **d_Sw000 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Sw001 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Sw010 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Sw011 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Sw100 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Sw101 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Sw110 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Sw111 = (float**)malloc(ngpu*sizeof(float*));
+  lint3d cs = lint3d_make(ns,ss,fdm);
+  d_Sw000 = (float**)malloc(ngpu*sizeof(float*));
+  d_Sw001 = (float**)malloc(ngpu*sizeof(float*));
+  d_Sw010 = (float**)malloc(ngpu*sizeof(float*));
+  d_Sw011 = (float**)malloc(ngpu*sizeof(float*));
+  d_Sw100 = (float**)malloc(ngpu*sizeof(float*));
+  d_Sw101 = (float**)malloc(ngpu*sizeof(float*));
+  d_Sw110 = (float**)malloc(ngpu*sizeof(float*));
+  d_Sw111 = (float**)malloc(ngpu*sizeof(float*));
 
   for (int g = 0; g < ngpu; g++){
     cudaSetDevice(g);
@@ -408,9 +233,9 @@ int main(int argc, char* argv[]) {
   }
 
   // z, x, and y coordinates of each source
-  int **d_Sjz = (int**)malloc(ngpu*sizeof(int*));
-  int **d_Sjx = (int**)malloc(ngpu*sizeof(int*));
-  int **d_Sjy = (int**)malloc(ngpu*sizeof(int*));
+  d_Sjz = (int**)malloc(ngpu*sizeof(int*));
+  d_Sjx = (int**)malloc(ngpu*sizeof(int*));
+  d_Sjy = (int**)malloc(ngpu*sizeof(int*));
   for (int g = 0; g < ngpu; g++){
     cudaSetDevice(g);
     cudaMalloc(&d_Sjz[g], ns * sizeof(int));
@@ -423,98 +248,37 @@ int main(int argc, char* argv[]) {
     sf_check_gpu_error("copy source coords to device");
   }
 
-
-  /* calculate 3d linear interpolation coefficients for receiver locations and copy to each GPU*/
-  cr = lint3d_make(nr,rr,fdm);
-  float **d_Rw000 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Rw001 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Rw010 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Rw011 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Rw100 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Rw101 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Rw110 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_Rw111 = (float**)malloc(ngpu*sizeof(float*));
-  if (interp){
-    for (int g = 0; g < ngpu; g++){
-      cudaSetDevice(g);
-      cudaMalloc(&d_Rw000[g], nr * sizeof(float));
-      cudaMalloc(&d_Rw001[g], nr * sizeof(float));
-      cudaMalloc(&d_Rw010[g], nr * sizeof(float));
-      cudaMalloc(&d_Rw011[g], nr * sizeof(float));
-      cudaMalloc(&d_Rw100[g], nr * sizeof(float));
-      cudaMalloc(&d_Rw101[g], nr * sizeof(float));
-      cudaMalloc(&d_Rw110[g], nr * sizeof(float));
-      cudaMalloc(&d_Rw111[g], nr * sizeof(float));
-      sf_check_gpu_error("cudaMalloc receiver interpolation coefficients to device");
-      cudaMemcpy(d_Rw000[g], cr->w000, nr * sizeof(float), cudaMemcpyDefault);
-      cudaMemcpy(d_Rw001[g], cr->w001, nr * sizeof(float), cudaMemcpyDefault);
-      cudaMemcpy(d_Rw010[g], cr->w010, nr * sizeof(float), cudaMemcpyDefault);
-      cudaMemcpy(d_Rw011[g], cr->w011, nr * sizeof(float), cudaMemcpyDefault);
-      cudaMemcpy(d_Rw100[g], cr->w100, nr * sizeof(float), cudaMemcpyDefault);
-      cudaMemcpy(d_Rw101[g], cr->w101, nr * sizeof(float), cudaMemcpyDefault);
-      cudaMemcpy(d_Rw110[g], cr->w110, nr * sizeof(float), cudaMemcpyDefault);
-      cudaMemcpy(d_Rw111[g], cr->w111, nr * sizeof(float), cudaMemcpyDefault);
-      sf_check_gpu_error("copy receiver interpolation coefficients to device");
-
-    }
-  }
-
-  // z, x, and y coordinates of each receiver
-  int **d_Rjz = (int**)malloc(ngpu*sizeof(int*));
-  int **d_Rjx = (int**)malloc(ngpu*sizeof(int*));
-  int **d_Rjy = (int**)malloc(ngpu*sizeof(int*));
-  for (int g = 0; g < ngpu; g++){
-    cudaSetDevice(g);
-    cudaMalloc(&d_Rjz[g], nr * sizeof(int));
-    cudaMalloc(&d_Rjx[g], nr * sizeof(int));
-    cudaMalloc(&d_Rjy[g], nr * sizeof(int));
-    sf_check_gpu_error("cudaMalloc receiver coords to device");
-    cudaMemcpy(d_Rjz[g], cr->jz, nr * sizeof(int), cudaMemcpyDefault);
-    cudaMemcpy(d_Rjx[g], cr->jx, nr * sizeof(int), cudaMemcpyDefault);
-    cudaMemcpy(d_Rjy[g], cr->jy, nr * sizeof(int), cudaMemcpyDefault);
-    sf_check_gpu_error("copy receiver coords to device");
-  }
-
-  /*------------------------------------------------------------*/
-
-
+}
+static void setup_fd_cooef(const fdm3d &fdm, float &idz, float &idx, float &idy)
+{
   /*------------------------------------------------------------*/
   /* setup FD coefficients */
-  idz = 1/dz;
-  idx = 1/dx;
-  idy = 1/dy;
+  idz = 1/fdm->dz;;
+  idx = 1/fdm->dx;
+  idy = 1/fdm->dy;
   /*------------------------------------------------------------*/
+}
 
-
+static void read_density_velocity(sf_file &Fden, sf_file &Fccc, const fdm3d &fdm, float *&h_ro, float *&h_c11, float *&h_c22, float *&h_c33, float *&h_c44, float *&h_c55, float *&h_c66, float *&h_c12, float *&h_c13, float *&h_c23, int nz, int nx, int ny)
+{
   /*------------------------------------------------------------*/
   /* read in model density and stiffness arrays */
-  float **d_ro = (float**)malloc(ngpu*sizeof(float*));
-  float **d_c11 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_c22 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_c33 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_c44 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_c55 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_c66 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_c12 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_c13 = (float**)malloc(ngpu*sizeof(float*));
-  float **d_c23 = (float**)malloc(ngpu*sizeof(float*));
-
   float *tt1 = (float*)malloc(nz*nx*ny*sizeof(float));
 
   /* input density */
-  float *h_ro = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_ro = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
   sf_floatread(tt1,nz*nx*ny,Fden);     expand_cpu(tt1, h_ro, fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
 
   /* input stiffness */
-  float *h_c11 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  float *h_c22 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  float *h_c33 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  float *h_c44 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  float *h_c55 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  float *h_c66 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  float *h_c12 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  float *h_c13 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  float *h_c23 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_c11 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_c22 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_c33 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_c44 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_c55 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_c66 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_c12 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_c13 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
+  h_c23 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
   sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c11,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
   sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c22,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
   sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c33,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
@@ -525,6 +289,19 @@ int main(int argc, char* argv[]) {
   sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c13,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
   sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c23,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
   free(tt1);
+}
+static void copy_den_vel_to_dev(const fdm3d &fdm, float **&d_ro , float **&d_c11, float **&d_c22, float **&d_c33, float **&d_c44, float **&d_c55, float **&d_c66, float **&d_c12, float **&d_c13, float **&d_c23, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, int nyinterior, int ngpu)
+{
+  d_ro = (float**)malloc(ngpu*sizeof(float*));
+  d_c11 = (float**)malloc(ngpu*sizeof(float*));
+  d_c22 = (float**)malloc(ngpu*sizeof(float*));
+  d_c33 = (float**)malloc(ngpu*sizeof(float*));
+  d_c44 = (float**)malloc(ngpu*sizeof(float*));
+  d_c55 = (float**)malloc(ngpu*sizeof(float*));
+  d_c66 = (float**)malloc(ngpu*sizeof(float*));
+  d_c12 = (float**)malloc(ngpu*sizeof(float*));
+  d_c13 = (float**)malloc(ngpu*sizeof(float*));
+  d_c23 = (float**)malloc(ngpu*sizeof(float*));
 
   // allocate density and stiffness sub-domain arrays on each GPU and copy the data
   for (int g = 0; g < ngpu; g++){
@@ -555,30 +332,34 @@ int main(int argc, char* argv[]) {
 
   }
 
+}
 
+static void setup_boundary(const fdm3d &fdm, float **&d_bzl_s, float **&d_bzh_s, float **&d_bxl_s, float **&d_bxh_s, float **&d_byl_s, float **&d_byh_s, const float *h_ro, const float *h_c55, float &spo, int nyinterior, int ngpu, float dt, bool dabc)
+{
   /*------------------------------------------------------------*/
   /* Boundary condition setup */
-  float **d_bzl_s = (float**)malloc(ngpu*sizeof(float*));
-  float **d_bzh_s = (float**)malloc(ngpu*sizeof(float*));
-  float **d_bxl_s = (float**)malloc(ngpu*sizeof(float*));
-  float **d_bxh_s = (float**)malloc(ngpu*sizeof(float*));
-  float **d_byl_s = (float**)malloc(ngpu*sizeof(float*));
-  float **d_byh_s = (float**)malloc(ngpu*sizeof(float*));
+  d_bzl_s = (float**)malloc(ngpu*sizeof(float*));
+  d_bzh_s = (float**)malloc(ngpu*sizeof(float*));
+  d_bxl_s = (float**)malloc(ngpu*sizeof(float*));
+  d_bxh_s = (float**)malloc(ngpu*sizeof(float*));
+  d_byl_s = (float**)malloc(ngpu*sizeof(float*));
+  d_byh_s = (float**)malloc(ngpu*sizeof(float*));
 
   float *h_bzl_s, *h_bzh_s;
   float *h_bxl_s, *h_bxh_s;
   float *h_byl_s, *h_byh_s;
 
-  float spo = 0;
+  spo = 0;
+  int nb = fdm->nb;
   if(dabc) {
 
     /* one-way abc setup   */
     float d;
     float *vs1 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
 
-    for (iy = 0; iy < fdm->nypad; iy++) {
-      for (ix = 0; ix < fdm->nxpad; ix++) {
-        for (iz = 0; iz < fdm->nzpad; iz++) {
+    for (int iy = 0; iy < fdm->nypad; iy++) {
+      for (int ix = 0; ix < fdm->nxpad; ix++) {
+        for (int iz = 0; iz < fdm->nzpad; iz++) {
           vs1[iy * fdm->nzpad * fdm->nxpad + iz * fdm->nxpad + ix] = sqrt(h_c55[iy * fdm->nxpad * fdm->nzpad + iz * fdm->nxpad + ix] / h_ro[iy * fdm->nxpad * fdm->nzpad + iz * fdm->nxpad + ix]);
         }
       }
@@ -653,8 +434,210 @@ int main(int argc, char* argv[]) {
     free(vs1);
   }
   /*------------------------------------------------------------*/
+}
+
+static void check_zx_dim(const fdm3d &fdm, int ngpu)
+{
+  // check that dimmeionsons are ok for FD kernels
+  if ((fdm->nzpad - 8) % 24 != 0){
+    sf_error("nz + 2*nb - 8 is not a multiple of 24");
+  }
+  if ((fdm->nxpad - 8) % 24 != 0){
+    sf_error("nx + 2*nb - 8 is not a multiple of 24");
+  }
+  if ((fdm->nypad % ngpu) != 0){
+    sf_error("You are using %d GPUs.\n(ny + 2*nb) must me a multiple of %d\nChange model dimensions or select a different number of GPUs", ngpu, ngpu);
+  }
+}
+static void set_nylocal(const fdm3d &fdm, int *nylocal, int ngpu, int nyinterior)
+{
+  // all interior nodes need 8 additional ghost slices (4 on each side of the y axis)
+  for (int g = 0; g < ngpu; g++){
+    nylocal[g] = nyinterior + 8;
+  }
+
+  // exterior nodes only require 4 additional ghost slices
+  if (ngpu >= 2){
+    nylocal[0] = nyinterior + 4;
+    nylocal[ngpu-1] = nyinterior + 4;
+  }
+
+  // if using 1 GPU, this GPU holds the entire domain
+  if (ngpu == 1){
+    nylocal[0] = fdm->nypad;
+  }
+}
+
+// entry point
+int main(int argc, char* argv[]) {
+
+  bool verb,fsrf,snap,ssou,dabc,interp;
+  int  jsnap,jdata;
+
+  /* I/O files */
+  sf_file Fwav=NULL; /* wavelet   */
+  sf_file Fsou=NULL; /* sources   */
+  sf_file Frec=NULL; /* receivers */
+  sf_file Fccc=NULL; /* velocity  */
+  sf_file Fden=NULL; /* density   */
+  sf_file Fdat=NULL; /* data      */
+  sf_file Fwfl=NULL; /* wavefield */
+
+  /* cube axes */
+  sf_axis at,ax,ay,az;
+  sf_axis as,ar;
+
+  int     nt,nz,nx,ny,ns,nr,nb;
+  int     it;
+  float   dt,idz,idx,idy;
+
+  /* FDM structure */
+  fdm3d    fdm=NULL;
+
+  /* I/O arrays */
+  pt3d   *ss=NULL;           /* sources   */
+  pt3d   *rr=NULL;           /* receivers */
 
 
+  /*------------------------------------------------------------*/
+  // used for writing wavefield to file, only needed if snap=y
+  float ***uox, ***uoy, ***uoz;
+  float *h_uox, *h_uoy, *h_uoz;
+  uox = uoy = uoz = NULL;
+  h_uox = h_uoy = h_uoz = NULL;
+
+
+  /* Gaussian bell */
+  int nbell;
+
+  /* wavefield cut params */
+  float     ***uc=NULL;
+
+  /* init RSF */
+  sf_init(argc,argv);
+
+
+  /*------------------------------------------------------------*/
+  /* init GPU */
+  int ngpu;
+  if (! sf_getint("ngpu", &ngpu)) ngpu = 1; /* how many local GPUs to use */
+  sf_warning("using %d GPUs", ngpu);
+  for (int g = 0; g < ngpu; g++){
+    cudaSetDevice(g);
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+  }
+
+
+  /*------------------------------------------------------------*/
+  /* execution flags */
+  if(! sf_getbool("verb",&verb)) verb=false; /* verbosity flag */
+  if(! sf_getbool("snap",&snap)) snap=false; /* wavefield snapshots flag */
+  if(! sf_getbool("free",&fsrf)) fsrf=false; /* free surface flag */
+  if(! sf_getbool("ssou",&ssou)) ssou=false; /* stress source */
+  if(! sf_getbool("dabc",&dabc)) dabc=false; /* absorbing BC */
+  if(! sf_getbool("interp",&interp)) interp=true; /* perform linear interpolation on receiver data */
+
+
+  /*------------------------------------------------------------*/
+  /* I/O files */
+  Fwav = sf_input ("in"); /* wavelet   */
+  Fccc = sf_input ("ccc"); /* stiffness */
+  Fden = sf_input ("den"); /* density   */
+  Fsou = sf_input ("sou"); /* sources   */
+  Frec = sf_input ("rec"); /* receivers */
+  Fwfl = sf_output("wfl"); /* wavefield */
+  Fdat = sf_output("out"); /* data      */
+
+
+  /*------------------------------------------------------------*/
+  /* axes */
+  at = sf_iaxa(Fwav,3); sf_setlabel(at,"t"); if(verb) sf_raxa(at); /* time */
+  az = sf_iaxa(Fccc,1); sf_setlabel(az,"z"); if(verb) sf_raxa(az); /* depth */
+  ax = sf_iaxa(Fccc,2); sf_setlabel(ax,"x"); if(verb) sf_raxa(ax); /* space x */
+  ay = sf_iaxa(Fccc,3); sf_setlabel(ay,"y"); if(verb) sf_raxa(ay); /* space y */
+
+  sf_axis asz, asx, asy;
+  asz = sf_iaxa(Fsou, 2); asx = sf_iaxa(Fsou, 3); asy = sf_iaxa(Fsou, 4);
+  as = sf_maxa(sf_n(asz) * sf_n(asx) * sf_n(asy), sf_d(asx), sf_o(asx));
+
+  sf_axis arz, arx, ary;
+  arz = sf_iaxa(Frec, 2); arx = sf_iaxa(Frec, 3); ary = sf_iaxa(Frec, 4);
+  ar = sf_maxa(sf_n(arz) * sf_n(arx) * sf_n(ary), sf_d(arx), sf_o(arx));
+
+  nt = sf_n(at); dt = sf_d(at);
+  nz = sf_n(az);
+  nx = sf_n(ax);
+  ny = sf_n(ay);
+
+  ns = sf_n(as);
+  nr = sf_n(ar);
+
+
+  /*------------------------------------------------------------*/
+  /* other execution parameters */
+  if(! sf_getint("nbell",&nbell)) nbell=5;  /* bell size */
+  if(verb) sf_warning("nbell=%d",nbell);
+  if(! sf_getint("jdata",&jdata)) jdata=1;  /* extract receiver data every jdata time steps */
+  if(snap) {
+    if(! sf_getint("jsnap",&jsnap)) jsnap=nt;  /* save wavefield every jsnap time steps */
+  }
+
+  if( !sf_getint("nb",&nb) || nb<NOP) nb=NOP;
+
+  /*------------------------------------------------------------*/
+  /* 3D vector components */
+  int nc=3;
+  sf_axis ac=sf_maxa(nc  ,0,1);
+  setup_output_data(Fdat, at, ar, ac, nt, jdata, dt);
+
+  float **d_bell = setup_bell(nbell, ngpu);
+  float **d_ww = init_wavelet(Fwav, ns, nc, nt, ngpu);
+
+  sf_axis full_az = sf_maxa(sf_n(az), sf_o(az), sf_d(az));
+  sf_axis full_ax = sf_maxa(sf_n(ax), sf_o(ax), sf_d(ax));
+  sf_axis full_ay = sf_maxa(sf_n(ay), sf_o(ay), sf_d(ay));
+  fdm3d totalfdm=fdutil3d_init(verb,fsrf,full_az,full_ax,full_ay,nb,1);
+  update_axis(totalfdm, full_az, full_ax, full_ay, verb);
+  if (snap)  set_output_wfd(Fwfl, at, full_az, full_ax, full_ay, ac, nt, dt, jsnap, verb);
+
+  float *h_dd, *h_dd_combined, **d_dd;
+  setup_output_array(h_dd, h_dd_combined, d_dd, ngpu, nr, nc);
+  setup_src_rcv_cord(Fsou, Frec, ss, rr, ns, nr);
+
+  float *h_ro,  *h_c11,  *h_c22,  *h_c33,  *h_c44,  *h_c55,  *h_c66,  *h_c12,  *h_c13,  *h_c23;
+  read_density_velocity(Fden, Fccc, totalfdm, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, nz, nx, ny);
+
+  /*------------------------------------------------------------*/
+  // TODO: put time block stuff here
+  /* expand domain for FD operators and ABC */
+  fdm=fdutil3d_init(verb,fsrf,az,ax,ay,nb,1);
+  update_axis(fdm, az, ax, ay, verb);
+
+  /*------------------------------------------------------------*/
+  /* compute sub-domain dimmensions (domain decomposition) */
+  int nyinterior = (fdm->nypad / ngpu);   // size of sub-domains in y-dimension EXCLUDING any ghost cells from adjacent GPUs
+  int *nylocal = (int*)malloc(ngpu*sizeof(int));  // size of sub-domains in y-dimension INCLUDING any ghost cells from adjacent GPUs
+  set_nylocal(fdm, nylocal, ngpu, nyinterior);
+  check_zx_dim(fdm, ngpu);
+  if(snap) { alloc_wlf(fdm, uoz, uox, uoy, h_uoz, h_uox, h_uoy, uc, nyinterior); }
+  float **d_Sw000,  **d_Sw001,  **d_Sw010,  **d_Sw011,  **d_Sw100,  **d_Sw101,  **d_Sw110,  **d_Sw111;
+  float **d_Rw000,  **d_Rw001,  **d_Rw010,  **d_Rw011,  **d_Rw100,  **d_Rw101,  **d_Rw110,  **d_Rw111;
+  int **d_Sjz,  **d_Sjx,  **d_Sjy;
+  int **d_Rjz,  **d_Rjx,  **d_Rjy;
+
+  /* calculate 3d linear interpolation coefficients for source/receiver locations and copy to each GPU*/
+  setup_interp_cooef(d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, fdm, ss, ns, ngpu);
+  setup_interp_cooef(d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, fdm, rr, nr, ngpu);
+
+  setup_fd_cooef(fdm, idz, idx, idy);
+  float **d_ro ,  **d_c11,  **d_c22,  **d_c33,  **d_c44,  **d_c55,  **d_c66,  **d_c12,  **d_c13,  **d_c23;
+  // TODO: we need interpolation here for h_ro, h_c11 ... h_c23
+  // TODO: rename h_ro and other similar to full_h_ro
+  copy_den_vel_to_dev(fdm, d_ro , d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, nyinterior, ngpu);
+
+  float spo = 0;
+  float **d_bzl_s,  **d_bzh_s,  **d_bxl_s,  **d_bxh_s,  **d_byl_s,  **d_byh_s;
+  setup_boundary(fdm, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s, h_ro, h_c55, spo, nyinterior, ngpu, dt, dabc);
 
   /*------------------------------------------------------------*/
   /* displacement: um = U @ t-1; uo = U @ t; up = U @ t+1 */
