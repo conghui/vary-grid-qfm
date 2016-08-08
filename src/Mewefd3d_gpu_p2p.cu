@@ -1228,16 +1228,18 @@ int main(int argc, char* argv[]) {
 
   setup_src_rcv_cord(Fsou, Frec, ss, rr, ns, nr);
 
-  float *h_ro,  *h_c11,  *h_c22,  *h_c33,  *h_c44,  *h_c55,  *h_c66,  *h_c12,  *h_c13,  *h_c23;
-  read_density_velocity(Fden, Fccc, totalfdm, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, nz, nx, ny);
+  float *full_h_ro,  *full_h_c11,  *full_h_c22,  *full_h_c33,  *full_h_c44,  *full_h_c55,  *full_h_c66,  *full_h_c12,  *full_h_c13,  *full_h_c23;
+  read_density_velocity(Fden, Fccc, totalfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, nz, nx, ny);
 
-  run(Fwfl, Fdat, ss, rr, az, ax, ay, nt, dt, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, d_ww, ns, nr, nb, ngpu, jdata, jsnap, nbell, nc, interp, ssou,  dabc, snap, fsrf, verb);
+  // TODO: put your code here, update az, ax, zy, nt, dt, then everything is supposed to be fine
+  // TODO: you also need to interpolate full_*
+  run(Fwfl, Fdat, ss, rr, az, ax, ay, nt, dt, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, d_ww, ns, nr, nb, ngpu, jdata, jsnap, nbell, nc, interp, ssou,  dabc, snap, fsrf, verb);
 
   /*------------------------------------------------------------*/
   /* deallocate host arrays */
   free(ss); free(rr);
-  free(h_ro);
-  free(h_c11); free(h_c22); free(h_c33); free(h_c44); free(h_c55); free(h_c66); free(h_c12); free(h_c13); free(h_c23);
+  free(full_h_ro);
+  free(full_h_c11); free(full_h_c22); free(full_h_c33); free(full_h_c44); free(full_h_c55); free(full_h_c66); free(full_h_c12); free(full_h_c13); free(full_h_c23);
 
   /*------------------------------------------------------------*/
   /* deallocate GPU arrays */
