@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
   /*------------------------------------------------------------*/
   /* init GPU */
   int ngpu;
-  if (! sf_getint("ngpu", &ngpu)) ngpu = 1;	/* how many local GPUs to use */
+  if (! sf_getint("ngpu", &ngpu)) ngpu = 1; /* how many local GPUs to use */
   sf_warning("using %d GPUs", ngpu);
   for (int g = 0; g < ngpu; g++){
     cudaSetDevice(g);
@@ -156,12 +156,10 @@ int main(int argc, char* argv[]) {
   sf_axis asz, asx, asy;
   asz = sf_iaxa(Fsou, 2); asx = sf_iaxa(Fsou, 3); asy = sf_iaxa(Fsou, 4);
   as = sf_maxa(sf_n(asz) * sf_n(asx) * sf_n(asy), sf_d(asx), sf_o(asx));
-  //as = sf_iaxa(Fsou,2); sf_setlabel(as,"s"); if(verb) sf_raxa(as); [> sources <]
 
   sf_axis arz, arx, ary;
   arz = sf_iaxa(Frec, 2); arx = sf_iaxa(Frec, 3); ary = sf_iaxa(Frec, 4);
   ar = sf_maxa(sf_n(arz) * sf_n(arx) * sf_n(ary), sf_d(arx), sf_o(arx));
-  //ar = sf_iaxa(Frec,2); sf_setlabel(ar,"r"); if(verb) sf_raxa(ar); [> receivers <]
 
   nt = sf_n(at); dt = sf_d(at);
   nz = sf_n(az); dz = sf_d(az);
@@ -196,9 +194,9 @@ int main(int argc, char* argv[]) {
   /*------------------------------------------------------------*/
   /* compute sub-domain dimmensions (domain decomposition) */
 
-  int nyinterior = (fdm->nypad / ngpu); 	// size of sub-domains in y-dimension EXCLUDING any ghost cells from adjacent GPUs
+  int nyinterior = (fdm->nypad / ngpu);   // size of sub-domains in y-dimension EXCLUDING any ghost cells from adjacent GPUs
 
-  int *nylocal = (int*)malloc(ngpu*sizeof(int));	// size of sub-domains in y-dimension INCLUDING any ghost cells from adjacent GPUs
+  int *nylocal = (int*)malloc(ngpu*sizeof(int));  // size of sub-domains in y-dimension INCLUDING any ghost cells from adjacent GPUs
 
   // all interior nodes need 8 additional ghost slices (4 on each side of the y axis)
   for (int g = 0; g < ngpu; g++){
@@ -734,7 +732,7 @@ int main(int argc, char* argv[]) {
 
 
   /*------------------------------------------------------------*/
-  /* precompute 1/ro * dt^2 									  */
+  /* precompute 1/ro * dt^2                     */
   /*------------------------------------------------------------*/
   for (int g = 0; g < ngpu; g++){
     cudaSetDevice(g);
@@ -756,8 +754,8 @@ int main(int argc, char* argv[]) {
 
     /*------------------------------------------------------------*/
     /* from displacement to strain                                */
-    /*		- Compute strains from displacements as in equation 1 */
-    /*			- Step #1	(Steps denoted are as in Figure 2)	  */
+    /*    - Compute strains from displacements as in equation 1 */
+    /*      - Step #1 (Steps denoted are as in Figure 2)    */
     /*------------------------------------------------------------*/
     for (int g = 0; g < ngpu; g++){
       cudaSetDevice(g);
@@ -769,8 +767,8 @@ int main(int argc, char* argv[]) {
 
     /*------------------------------------------------------------*/
     /* from strain to stress                                      */
-    /*		- Compute stress from strain as in equation 2		  */
-    /*			- Step #2										  */
+    /*    - Compute stress from strain as in equation 2     */
+    /*      - Step #2                     */
     /*------------------------------------------------------------*/
     for (int g = 0; g < ngpu; g++){
       cudaSetDevice(g);
@@ -783,9 +781,9 @@ int main(int argc, char* argv[]) {
 
     /*------------------------------------------------------------*/
     /* free surface                                               */
-    /*		- sets the z-component of stress tensor along the	  */
-    /*			free surface boundary to 0						  */
-    /*			- Step #3										  */
+    /*    - sets the z-component of stress tensor along the   */
+    /*      free surface boundary to 0              */
+    /*      - Step #3                     */
     /*------------------------------------------------------------*/
     if(fsrf) {
       for (int g = 0; g < ngpu; g++){
@@ -800,7 +798,7 @@ int main(int argc, char* argv[]) {
 
     /*------------------------------------------------------------*/
     /* inject stress source                                       */
-    /*		- Step #4											  */
+    /*    - Step #4                       */
     /*------------------------------------------------------------*/
     if(ssou) {
       for (int g = 0; g < ngpu; g++){
@@ -860,7 +858,7 @@ int main(int argc, char* argv[]) {
 
     /*------------------------------------------------------------*/
     /* from stress to acceleration  (first term in RHS of eq. 3)  */
-    /*		- Step #5											  */
+    /*    - Step #5                       */
     /*------------------------------------------------------------*/
     for (int g = 0; g < ngpu; g++){
       cudaSetDevice(g);
@@ -873,7 +871,7 @@ int main(int argc, char* argv[]) {
 
     /*------------------------------------------------------------*/
     /* inject acceleration source  (second term in RHS of eq. 3)  */
-    /*		- Step #6											  */
+    /*    - Step #6                       */
     /*------------------------------------------------------------*/
     if(!ssou) {
       for (int g = 0; g < ngpu; g++){
@@ -891,8 +889,8 @@ int main(int argc, char* argv[]) {
 
     /*------------------------------------------------------------*/
     /* step forward in time                                       */
-    /*		- Compute forward time step based on acceleration	  */
-    /*			- Step #7										  */
+    /*    - Compute forward time step based on acceleration   */
+    /*      - Step #7                     */
     /*------------------------------------------------------------*/
     for (int g = 0; g < ngpu; g++){
       cudaSetDevice(g);
@@ -914,7 +912,7 @@ int main(int argc, char* argv[]) {
 
     /*------------------------------------------------------------*/
     /* apply boundary conditions                                  */
-    /*		- Step #8											  */
+    /*    - Step #8                       */
     /*------------------------------------------------------------*/
     if(dabc) {
       /*---------------------------------------------------------------*/
@@ -1048,8 +1046,8 @@ int main(int argc, char* argv[]) {
 
 
     /*------------------------------------------------------------*/
-    /* cut wavefield and save 									  */
-    /*		- Step #9											  */
+    /* cut wavefield and save                     */
+    /*    - Step #9                       */
     /*------------------------------------------------------------*/
     if(snap && it%jsnap==0) {
 
@@ -1098,10 +1096,10 @@ int main(int argc, char* argv[]) {
     }
 
     /*------------------------------------------------------------*/
-    /* extract receiver data									  */
+    /* extract receiver data                    */
     /*------------------------------------------------------------*/
     if(it%jdata==0) {
-      if (interp){	// use interpolation
+      if (interp){  // use interpolation
         for (int g = 0; g < ngpu; g++){
           cudaSetDevice(g);
           cudaMemset(d_dd[g], 0, nr*nc*sizeof(float));
@@ -1111,7 +1109,7 @@ int main(int argc, char* argv[]) {
         }
         sf_check_gpu_error("lint3d_extract kernel");
       }
-      else {		// no interpolation
+      else {    // no interpolation
         for (int g = 0; g < ngpu; g++){
           cudaSetDevice(g);
           cudaMemset(d_dd[g], 0, nr*nc*sizeof(float));
@@ -1139,7 +1137,7 @@ int main(int argc, char* argv[]) {
     }
 
 
-  }	// END MAIN LOOP
+  } // END MAIN LOOP
 
 
   /*------------------------------------------------------------*/
