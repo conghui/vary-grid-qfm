@@ -22,7 +22,7 @@ par = {
     'kt':100,'frq':10,
 
     # Modelling parameters
-    'snap':'y','jsnap':50,'nb':44, 'verb':'y',
+    'snap':'y','jsnap':400,'nb':44, 'verb':'y',
     'nbell':5, 'jdata':8,'ssou':'y',
 
     # Output
@@ -167,7 +167,7 @@ for m in ['VTI']:
         ''' %par)
 
     # . . Make 3D wavefield modelling movie
-    Result(m+'w-3d-GPU','window n5=1 f5=%(iframe)d min1=0 min2=0 min3=0 n4=1 n1=%(nz)d n2=%(nx)d n3=%(ny)d | byte gainpanel=a pclip=99.9|' %par + fdmod.cgrey3d('pclip=99.9 screenht=11 label1=Depth label2=Inline label3=Crossline unit1=km unit2=km unit3=km '+center,par))
+    # Result(m+'w-3d-GPU','window n5=1 f5=%(iframe)d min1=0 min2=0 min3=0 n4=1 n1=%(nz)d n2=%(nx)d n3=%(ny)d | byte gainpanel=a pclip=99.9|' %par + fdmod.cgrey3d('pclip=99.9 screenht=11 label1=Depth label2=Inline label3=Crossline unit1=km unit2=km unit3=km '+center,par))
 
     for i in range(0):
         tag = "%d"%i
@@ -177,6 +177,6 @@ for m in ['VTI']:
     for i in range(1):
         tag = "%d-xz"%i
         Plot(m+'w-3d-GPU'+tag,m+'w-3d-GPU',
-       'window n4=1 f4=%d f3=%d n3=1 min1=0 min2=0 n1=%d n2=%d  | grey color=j gainpanel=e scalebar=y'%(i, par['ny']/2, par['nz'],par['nx'],),view=1)
+       'window f5=1 n5=1 n4=1 f4=%d f3=%d n3=1 min1=0 min2=0 n1=%d n2=%d  | grey color=j gainpanel=e scalebar=y'%(i, par['ny']/2, par['nz'],par['nx'],),view=1)
 
 End()

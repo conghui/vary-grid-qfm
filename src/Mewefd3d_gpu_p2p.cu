@@ -57,12 +57,155 @@ static void sf_check_gpu_error (const char *msg) {
         sf_error ("Cuda error: %s: %s", msg, cudaGetErrorString (err));
 }
 
+static void update_axis(const fdm3d &fdm, sf_axis &az, sf_axis &ax, sf_axis &ay, bool verb) {
+  sf_setn(az,fdm->nzpad); sf_seto(az,fdm->ozpad); if(verb) sf_raxa(az);
+  sf_setn(ax,fdm->nxpad); sf_seto(ax,fdm->oxpad); if(verb) sf_raxa(ax);
+  sf_setn(ay,fdm->nypad); sf_seto(ay,fdm->oypad); if(verb) sf_raxa(ay);
+}
+
+static float **setup_bell(int nbell, int ngpu)
+{
+  /*------------------------------------------------------------*/
+  /* setup bell for source injection smoothing */
+  if (nbell * 2 + 1 > 32){
+    sf_error("nbell must be <= 15\n");
+  }
+
+  float *h_bell;
+  h_bell = (float*)malloc((2*nbell+1)*(2*nbell+1)*(2*nbell+1)*sizeof(float));
+
+  float s = 0.5*nbell;
+  for (int iy=-nbell;iy<=nbell;iy++) {
+    for (int ix=-nbell;ix<=nbell;ix++) {
+      for(int iz=-nbell;iz<=nbell;iz++) {
+        h_bell[(iy + nbell) * (2*nbell+1) * (2*nbell+1) + (iz + nbell) * (2*nbell+1) + (ix + nbell)] = exp(-(iz*iz+ix*ix+iy*iy)/s);
+      }
+    }
+  }
+
+  // copy bell coeficients to the GPUs
+  float **d_bell = (float**)malloc(ngpu*sizeof(float*));
+  for (int g = 0; g < ngpu; g++){
+    cudaSetDevice(g);
+    cudaMalloc(&d_bell[g], (2*nbell+1)*(2*nbell+1)*(2*nbell+1)*sizeof(float));
+    sf_check_gpu_error("cudaMalloc d_bell");
+    cudaMemcpy(d_bell[g], h_bell, (2*nbell+1)*(2*nbell+1)*(2*nbell+1)*sizeof(float), cudaMemcpyDefault);
+    sf_check_gpu_error("copy d_bell to device");
+  }
+
+  free(h_bell);
+
+  return d_bell;
+  /*------------------------------------------------------------*/
+}
+static void setup_output_data(sf_file &Fdat, sf_axis &at, const sf_axis &ar, const sf_axis &ac, int nt, int jdata, float dt)
+{
+  /*------------------------------------------------------------*/
+  /* setup output data files and arrays */
+  sf_oaxa(Fdat,ar,1);
+  sf_oaxa(Fdat,ac,2);
+
+  sf_setn(at,nt/jdata);
+  sf_setd(at,dt*jdata);
+  sf_oaxa(Fdat,at,3);
+}
+
+static void set_output_wfd(sf_file &Fwfl, sf_axis &at, const sf_axis &az, const sf_axis &ax, const sf_axis &ay, const sf_axis &ac, int nt, float dt, int jsnap, bool verb)
+{
+  int ntsnap=0;
+  for(int it=0; it<nt; it++) {
+    if(it%jsnap==0) ntsnap++;
+  }
+  sf_setn(at,  ntsnap);
+  sf_setd(at,dt*jsnap);
+  if(verb) sf_raxa(at);
+
+  sf_oaxa(Fwfl,az,1);
+  sf_oaxa(Fwfl,ax,2);
+  sf_oaxa(Fwfl,ay,3);
+  sf_oaxa(Fwfl,ac, 4);
+  sf_oaxa(Fwfl,at, 5);
+}
+static void alloc_wlf(const fdm3d &fdm, float *** &uoz, float *** &uox, float *** &uoy, float *&h_uoz, float *&h_uox, float *&h_uoy, float ***&uc, int nyinterior)
+{
+    // Used to accumulate wavefield data from other GPUs
+    uoz=sf_floatalloc3(fdm->nzpad,fdm->nxpad,fdm->nypad);
+    uox=sf_floatalloc3(fdm->nzpad,fdm->nxpad,fdm->nypad);
+    uoy=sf_floatalloc3(fdm->nzpad,fdm->nxpad,fdm->nypad);
+    h_uoz = (float*)malloc(nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
+    h_uox = (float*)malloc(nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
+    h_uoy = (float*)malloc(nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
+
+    //uc=sf_floatalloc3(sf_n(az),sf_n(ax),sf_n(ay));
+    uc=sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+
+}
+static float **init_wavelet(sf_file &Fwav, int ns, int nc, int nt, int ngpu)
+{
+  /*------------------------------------------------------------*/
+  /* read source wavelet(s) and copy to each GPU (into d_ww) */
+  float ***ww=sf_floatalloc3(ns,nc,nt);
+  sf_floatread(ww[0][0],nt*nc*ns,Fwav);
+
+  float *h_ww = (float*)malloc(ns*nc*nt*sizeof(float));
+  for (int t = 0; t < nt; t++){
+    for (int c = 0; c < nc; c++){
+      for (int s = 0; s < ns; s++){
+        h_ww[t * nc * ns + c * ns + s]=ww[t][c][s];
+      }
+    }
+  }
+
+  float **d_ww = (float**)malloc(ngpu*sizeof(float*));
+  for (int g = 0; g < ngpu; g++){
+    cudaSetDevice(g);
+    cudaMalloc(&d_ww[g], ns*nc*nt*sizeof(float));
+    sf_check_gpu_error("cudaMalloc source wavelet to device");
+    cudaMemcpy(d_ww[g], h_ww, ns*nc*nt*sizeof(float), cudaMemcpyDefault);
+    sf_check_gpu_error("copy source wavelet to device");
+  }
+
+  free(**ww); free(*ww); free(ww);
+  return d_ww;
+  /*------------------------------------------------------------*/
+}
+static void check_zx_dim(const fdm3d &fdm, int ngpu)
+{
+  // check that dimmeionsons are ok for FD kernels
+  if ((fdm->nzpad - 8) % 24 != 0){
+    sf_error("nz + 2*nb - 8 is not a multiple of 24");
+  }
+  if ((fdm->nxpad - 8) % 24 != 0){
+    sf_error("nx + 2*nb - 8 is not a multiple of 24");
+  }
+  if ((fdm->nypad % ngpu) != 0){
+    sf_error("You are using %d GPUs.\n(ny + 2*nb) must me a multiple of %d\nChange model dimensions or select a different number of GPUs", ngpu, ngpu);
+  }
+}
+static void set_nylocal(const fdm3d &fdm, int *nylocal, int ngpu, int nyinterior)
+{
+  // all interior nodes need 8 additional ghost slices (4 on each side of the y axis)
+  for (int g = 0; g < ngpu; g++){
+    nylocal[g] = nyinterior + 8;
+  }
+
+  // exterior nodes only require 4 additional ghost slices
+  if (ngpu >= 2){
+    nylocal[0] = nyinterior + 4;
+    nylocal[ngpu-1] = nyinterior + 4;
+  }
+
+  // if using 1 GPU, this GPU holds the entire domain
+  if (ngpu == 1){
+    nylocal[0] = fdm->nypad;
+  }
+}
 
 // entry point
 int main(int argc, char* argv[]) {
 
   bool verb,fsrf,snap,ssou,dabc,interp;
-  int  jsnap,ntsnap,jdata;
+  int  jsnap,jdata;
 
   /* I/O files */
   sf_file Fwav=NULL; /* wavelet   */
@@ -75,9 +218,9 @@ int main(int argc, char* argv[]) {
 
   /* cube axes */
   sf_axis at,ax,ay,az;
-  sf_axis as,ar,ac;
+  sf_axis as,ar;
 
-  int     nt,nz,nx,ny,ns,nr,nc,nb;
+  int     nt,nz,nx,ny,ns,nr,nb;
   int     it,iz,ix,iy;
   float   dt,dz,dx,dy,idz,idx,idy;
 
@@ -85,7 +228,6 @@ int main(int argc, char* argv[]) {
   fdm3d    fdm=NULL;
 
   /* I/O arrays */
-  float***ww=NULL;           /* wavelet   */
   pt3d   *ss=NULL;           /* sources   */
   pt3d   *rr=NULL;           /* receivers */
 
@@ -94,6 +236,8 @@ int main(int argc, char* argv[]) {
   // used for writing wavefield to file, only needed if snap=y
   float ***uox, ***uoy, ***uoz;
   float *h_uox, *h_uoy, *h_uoz;
+  uox = uoy = uoz = NULL;
+  h_uox = h_uoy = h_uoz = NULL;
 
 
   /*------------------------------------------------------------*/
@@ -104,10 +248,6 @@ int main(int argc, char* argv[]) {
   int nbell;
 
   /* wavefield cut params */
-  sf_axis   acz=NULL,acx=NULL,acy=NULL;
-  int       nqz,nqx,nqy;
-  float     oqz,oqx,oqy;
-  float     dqz,dqx,dqy;
   float     ***uc=NULL;
 
   /* init RSF */
@@ -179,170 +319,37 @@ int main(int argc, char* argv[]) {
     if(! sf_getint("jsnap",&jsnap)) jsnap=nt;  /* save wavefield every jsnap time steps */
   }
 
-
-  /*------------------------------------------------------------*/
-  /* expand domain for FD operators and ABC */
   if( !sf_getint("nb",&nb) || nb<NOP) nb=NOP;
-
-  fdm=fdutil3d_init(verb,fsrf,az,ax,ay,nb,1);
-
-  sf_setn(az,fdm->nzpad); sf_seto(az,fdm->ozpad); if(verb) sf_raxa(az);
-  sf_setn(ax,fdm->nxpad); sf_seto(ax,fdm->oxpad); if(verb) sf_raxa(ax);
-  sf_setn(ay,fdm->nypad); sf_seto(ay,fdm->oypad); if(verb) sf_raxa(ay);
-
-
-  /*------------------------------------------------------------*/
-  /* compute sub-domain dimmensions (domain decomposition) */
-
-  int nyinterior = (fdm->nypad / ngpu);   // size of sub-domains in y-dimension EXCLUDING any ghost cells from adjacent GPUs
-
-  int *nylocal = (int*)malloc(ngpu*sizeof(int));  // size of sub-domains in y-dimension INCLUDING any ghost cells from adjacent GPUs
-
-  // all interior nodes need 8 additional ghost slices (4 on each side of the y axis)
-  for (int g = 0; g < ngpu; g++){
-    nylocal[g] = nyinterior + 8;
-  }
-
-  // exterior nodes only require 4 additional ghost slices
-  if (ngpu >= 2){
-    nylocal[0] = nyinterior + 4;
-    nylocal[ngpu-1] = nyinterior + 4;
-  }
-
-  // if using 1 GPU, this GPU holds the entire domain
-  if (ngpu == 1){
-    nylocal[0] = fdm->nypad;
-  }
-
-  // check that dimmeionsons are ok for FD kernels
-  if ((fdm->nzpad - 8) % 24 != 0){
-    sf_error("nz + 2*nb - 8 is not a multiple of 24");
-  }
-  if ((fdm->nxpad - 8) % 24 != 0){
-    sf_error("nx + 2*nb - 8 is not a multiple of 24");
-  }
-  if ((fdm->nypad % ngpu) != 0){
-    sf_error("You are using %d GPUs.\n(ny + 2*nb) must me a multiple of %d\nChange model dimensions or select a different number of GPUs", ngpu, ngpu);
-  }
-
-
-  /*------------------------------------------------------------*/
-  /* setup bell for source injection smoothing */
-  if (nbell * 2 + 1 > 32){
-    sf_error("nbell must be <= 15\n");
-  }
-
-  float *h_bell;
-  h_bell = (float*)malloc((2*nbell+1)*(2*nbell+1)*(2*nbell+1)*sizeof(float));
-
-  float s = 0.5*nbell;
-  for (iy=-nbell;iy<=nbell;iy++) {
-    for (ix=-nbell;ix<=nbell;ix++) {
-      for(iz=-nbell;iz<=nbell;iz++) {
-        h_bell[(iy + nbell) * (2*nbell+1) * (2*nbell+1) + (iz + nbell) * (2*nbell+1) + (ix + nbell)] = exp(-(iz*iz+ix*ix+iy*iy)/s);
-      }
-    }
-  }
-
-  // copy bell coeficients to the GPUs
-  float **d_bell = (float**)malloc(ngpu*sizeof(float*));
-  for (int g = 0; g < ngpu; g++){
-    cudaSetDevice(g);
-    cudaMalloc(&d_bell[g], (2*nbell+1)*(2*nbell+1)*(2*nbell+1)*sizeof(float));
-    sf_check_gpu_error("cudaMalloc d_bell");
-    cudaMemcpy(d_bell[g], h_bell, (2*nbell+1)*(2*nbell+1)*(2*nbell+1)*sizeof(float), cudaMemcpyDefault);
-    sf_check_gpu_error("copy d_bell to device");
-  }
-
-  /*------------------------------------------------------------*/
 
   /*------------------------------------------------------------*/
   /* 3D vector components */
-  nc=3;
-  ac=sf_maxa(nc  ,0,1);
-  /*------------------------------------------------------------*/
+  int nc=3;
+  sf_axis ac=sf_maxa(nc  ,0,1);
+  setup_output_data(Fdat, at, ar, ac, nt, jdata, dt);
 
+  float **d_bell = setup_bell(nbell, ngpu);
+  float **d_ww = init_wavelet(Fwav, ns, nc, nt, ngpu);
 
-  /*------------------------------------------------------------*/
-  /* setup output data files and arrays */
-  sf_oaxa(Fdat,ar,1);
-  sf_oaxa(Fdat,ac,2);
-
-  sf_setn(at,nt/jdata);
-  sf_setd(at,dt*jdata);
-  sf_oaxa(Fdat,at,3);
-
-  if(snap) {
-
-    // Used to accumulate wavefield data from other GPUs
-    uoz=sf_floatalloc3(fdm->nzpad,fdm->nxpad,fdm->nypad);
-    uox=sf_floatalloc3(fdm->nzpad,fdm->nxpad,fdm->nypad);
-    uoy=sf_floatalloc3(fdm->nzpad,fdm->nxpad,fdm->nypad);
-    h_uoz = (float*)malloc(nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
-    h_uox = (float*)malloc(nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
-    h_uoy = (float*)malloc(nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
-
-    nqz=sf_n(az);
-    nqx=sf_n(ax);
-    nqy=sf_n(ay);
-
-    oqz=sf_o(az);
-    oqx=sf_o(ax);
-    oqy=sf_o(ay);
-
-    dqz=sf_d(az);
-    dqx=sf_d(ax);
-    dqy=sf_d(ay);
-
-    acz = sf_maxa(nqz,oqz,dqz); sf_raxa(acz);
-    acx = sf_maxa(nqx,oqx,dqx); sf_raxa(acx);
-    acy = sf_maxa(nqy,oqy,dqy); sf_raxa(acy);
-
-    uc=sf_floatalloc3(sf_n(acz),sf_n(acx),sf_n(acy));
-
-    ntsnap=0;
-    for(it=0; it<nt; it++) {
-      if(it%jsnap==0) ntsnap++;
-    }
-    sf_setn(at,  ntsnap);
-    sf_setd(at,dt*jsnap);
-    if(verb) sf_raxa(at);
-
-    sf_oaxa(Fwfl,acz,1);
-    sf_oaxa(Fwfl,acx,2);
-    sf_oaxa(Fwfl,acy,3);
-    sf_oaxa(Fwfl,ac, 4);
-    sf_oaxa(Fwfl,at, 5);
-  }
-  /*------------------------------------------------------------*/
-
+  sf_axis full_az = sf_maxa(sf_n(az), sf_o(az), sf_d(az));
+  sf_axis full_ax = sf_maxa(sf_n(ax), sf_o(ax), sf_d(ax));
+  sf_axis full_ay = sf_maxa(sf_n(ay), sf_o(ay), sf_d(ay));
+  fdm3d totalfdm=fdutil3d_init(verb,fsrf,full_az,full_ax,full_ay,nb,1);
+  update_axis(totalfdm, full_az, full_ax, full_ay, verb);
+  if (snap)  set_output_wfd(Fwfl, at, full_az, full_ax, full_ay, ac, nt, dt, jsnap, verb);
 
   /*------------------------------------------------------------*/
-  /* read source wavelet(s) and copy to each GPU (into d_ww) */
-  ww=sf_floatalloc3(ns,nc,nt);
-  sf_floatread(ww[0][0],nt*nc*ns,Fwav);
-
-  float *h_ww;
-  h_ww = (float*)malloc(ns*nc*nt*sizeof(float));
-  for (int t = 0; t < nt; t++){
-    for (int c = 0; c < nc; c++){
-      for (int s = 0; s < ns; s++){
-        h_ww[t * nc * ns + c * ns + s]=ww[t][c][s];
-      }
-    }
-  }
-
-  float **d_ww = (float**)malloc(ngpu*sizeof(float*));
-  for (int g = 0; g < ngpu; g++){
-    cudaSetDevice(g);
-    cudaMalloc(&d_ww[g], ns*nc*nt*sizeof(float));
-    sf_check_gpu_error("cudaMalloc source wavelet to device");
-    cudaMemcpy(d_ww[g], h_ww, ns*nc*nt*sizeof(float), cudaMemcpyDefault);
-    sf_check_gpu_error("copy source wavelet to device");
-  }
+  // TODO: put time block stuff here
+  /* expand domain for FD operators and ABC */
+  fdm=fdutil3d_init(verb,fsrf,az,ax,ay,nb,1);
+  update_axis(fdm, az, ax, ay, verb);
 
   /*------------------------------------------------------------*/
-
+  /* compute sub-domain dimmensions (domain decomposition) */
+  int nyinterior = (fdm->nypad / ngpu);   // size of sub-domains in y-dimension EXCLUDING any ghost cells from adjacent GPUs
+  int *nylocal = (int*)malloc(ngpu*sizeof(int));  // size of sub-domains in y-dimension INCLUDING any ghost cells from adjacent GPUs
+  set_nylocal(fdm, nylocal, ngpu, nyinterior);
+  check_zx_dim(fdm, ngpu);
+  if(snap) { alloc_wlf(fdm, uoz, uox, uoy, h_uoz, h_uox, h_uoy, uc, nyinterior); }
 
   /*------------------------------------------------------------*/
   /* data array */
@@ -562,7 +569,7 @@ int main(int argc, char* argv[]) {
   float *h_bxl_s, *h_bxh_s;
   float *h_byl_s, *h_byh_s;
 
-  float spo;
+  float spo = 0;
   if(dabc) {
 
     /* one-way abc setup   */
@@ -1084,14 +1091,14 @@ int main(int argc, char* argv[]) {
       }
 
       // Write wavefield arrays to output file
-      cut3d(uoz,uc,fdm,acz,acx,acy);
-      sf_floatwrite(uc[0][0],sf_n(acx)*sf_n(acy)*sf_n(acz),Fwfl);
+      cut3d(uoz,uc,fdm,az,ax,ay);
+      sf_floatwrite(uc[0][0],sf_n(ax)*sf_n(ay)*sf_n(az),Fwfl);
 
-      cut3d(uox,uc,fdm,acz,acx,acy);
-      sf_floatwrite(uc[0][0],sf_n(acx)*sf_n(acy)*sf_n(acz),Fwfl);
+      cut3d(uox,uc,fdm,az,ax,ay);
+      sf_floatwrite(uc[0][0],sf_n(ax)*sf_n(ay)*sf_n(az),Fwfl);
 
-      cut3d(uoy,uc,fdm,acz,acx,acy);
-      sf_floatwrite(uc[0][0],sf_n(acx)*sf_n(acy)*sf_n(acz),Fwfl);
+      cut3d(uoy,uc,fdm,az,ax,ay);
+      sf_floatwrite(uc[0][0],sf_n(ax)*sf_n(ay)*sf_n(az),Fwfl);
 
     }
 
@@ -1143,10 +1150,8 @@ int main(int argc, char* argv[]) {
   /*------------------------------------------------------------*/
   /* deallocate host arrays */
 
-  free(**ww); free(*ww); free(ww); free(h_ww);
   free(h_dd); free(h_dd_combined);
   free(ss); free(rr);
-  free(h_bell);
   free(h_ro);
   free(h_c11); free(h_c22); free(h_c33); free(h_c44); free(h_c55); free(h_c66); free(h_c12); free(h_c13); free(h_c23);
 
