@@ -1,41 +1,10 @@
-/* 3D elastic time-domain FD modeling with GPU (For use in single node with one or more GPUs)*/
-// REV 9104
-
-/*
-  Authors: Robin M. Weiss and Jeffrey Shragge
-
-  Use of this code is freely avaiable. In publications, please reference the paper:
-  Weiss and Shragge, "Solving 3D Anisotropic Elastic Wave Equations on Parallel
-  GPU Devices", GEOPHYSICS. http://software.seg.org/2012/0063
-
-  This code is a GPU-enabled version of the ewefd3d module from the Madagascar
-  software package (see: http://www.reproducibility.org).  It implements a 3D
-  Finite-Difference Time Domain solver for the elastice wave equation with
-  2nd- and 8th- order temporal and spatial accuracy, respectively.  Computation
-  is distributed across an arbitrary number of GPU devices in a single compute node.
-  For more information, see (Weiss and Shragge, "Solving 3D Anisotropic Elastic Wave
-  Equations on Parallel GPU Devices", GEOPHYSICS. http://software.seg.org/2012/0063)
-*/
-
-/*
-  Copyright (C) 2012 University of Western Australia
-
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
-
-
+// TODO:
+// - make wave field arrays global on CPU
+// - one FDM3D structure describing the old wave fields, also make it a global variable
+// - at the begining of each time block, interpolate the wave fields to meet the requirement of current grid size
+// - copy the wave fields on CPU to GPU according to nyinterior
+// - after interpolation, the old FDM3D points to the current FDM3D
+// - at the last time step of each time block main loop, update the global wavefield arrays
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
@@ -52,6 +21,40 @@ extern "C" {
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #define NOP 4 /* derivative operator half-size */
+
+
+fdm3d clonefdm(const fdm3d &fdm)
+{
+  sf_axis az = sf_maxa(fdm->nz, fdm->oz, fdm->dz);
+  sf_axis ax = sf_maxa(fdm->nx, fdm->ox, fdm->dx);
+  sf_axis ay = sf_maxa(fdm->ny, fdm->oy, fdm->dy);
+
+  return fdutil3d_init(fdm->verb,fdm->free,az,ax,ay,fdm->nb,fdm->ompchunk);
+}
+
+static void init_host_umo(const fdm3d &fdm, float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
+{
+  int n1 = fdm->nzpad; int n2 = fdm->nxpad; int n3 = fdm->nypad;
+  int bytes = n1 * n2 * n3 * sizeof(float);
+
+  h_umz = sf_floatalloc3(n1, n2, n3); memset(h_umz[0][0], 0, bytes);
+  h_umx = sf_floatalloc3(n1, n2, n3); memset(h_umx[0][0], 0, bytes);
+  h_umy = sf_floatalloc3(n1, n2, n3); memset(h_umy[0][0], 0, bytes);
+  h_uoz = sf_floatalloc3(n1, n2, n3); memset(h_uoz[0][0], 0, bytes);
+  h_uox = sf_floatalloc3(n1, n2, n3); memset(h_uox[0][0], 0, bytes);
+  h_uoy = sf_floatalloc3(n1, n2, n3); memset(h_uoy[0][0], 0, bytes);
+}
+
+static void release_host_umo(float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
+{
+  free(**h_umx); free(*h_umx); free(h_umx);
+  free(**h_umz); free(*h_umz); free(h_umz);
+  free(**h_umy); free(*h_umy); free(h_umy);
+  free(**h_uox); free(*h_uox); free(h_uox);
+  free(**h_uoz); free(*h_uoz); free(h_uoz);
+  free(**h_uoy); free(*h_uoy); free(h_uoy);
+}
+
 
 // checks the current GPU device for an error flag and prints to stderr
 static void sf_check_gpu_error (const char *msg) {
@@ -973,7 +976,7 @@ static void make_axis(modeling_t *m, sf_axis &az, sf_axis &ax, sf_axis &ay)
   ay = sf_maxa(m->n3 - 2 * m->nb, m->o3 + m->nb * m->d3, m->d3);
 }
 
-static void run(sf_file Fwfl, sf_file Fdat, pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float **d_ww, int ns, int nr, int nb, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb)
+static void run(sf_file Fwfl, sf_file Fdat, fdm3d &oldfdm, pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float **d_ww, int ns, int nr, int nb, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb)
 {
 
   /*------------------------------------------------------------*/
@@ -1233,14 +1236,14 @@ int main(int argc, char* argv[]) {
   sf_axis full_az = sf_maxa(sf_n(az), sf_o(az), sf_d(az));
   sf_axis full_ax = sf_maxa(sf_n(ax), sf_o(ax), sf_d(ax));
   sf_axis full_ay = sf_maxa(sf_n(ay), sf_o(ay), sf_d(ay));
-  fdm3d totalfdm=fdutil3d_init(verb,fsrf,full_az,full_ax,full_ay,nb,1);
-  update_axis(totalfdm, full_az, full_ax, full_ay, verb);
+  fdm3d fullfdm=fdutil3d_init(verb,fsrf,full_az,full_ax,full_ay,nb,1);
+  update_axis(fullfdm, full_az, full_ax, full_ay, verb);
   if (snap)  set_output_wfd(Fwfl, at, full_az, full_ax, full_ay, ac, nt, dt, jsnap, verb);
 
   setup_src_rcv_cord(Fsou, Frec, ss, rr, ns, nr);
 
   float ***full_h_ro,  ***full_h_c11,  ***full_h_c22,  ***full_h_c33,  ***full_h_c44,  ***full_h_c55,  ***full_h_c66,  ***full_h_c12,  ***full_h_c13,  ***full_h_c23;
-  read_density_velocity(Fden, Fccc, totalfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, nz, nx, ny);
+  read_density_velocity(Fden, Fccc, fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, nz, nx, ny);
 
   sf_warning("begin conghui's code");
   int   timeblocks;
@@ -1280,6 +1283,12 @@ int main(int argc, char* argv[]) {
   init_sinc_table(8, 10000);
   modeling_t initmodel = make_modeling(vv0);
 
+  fdm3d oldfdm = clonefdm(fullfdm);
+
+  // initialize host prev and current wavefield
+  float ***h_umx, ***h_uox,  ***h_umy,  ***h_uoy,  ***h_umz,  ***h_uoz;
+  init_host_umo(oldfdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
+
   for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
     sf_warning("FORWARD BLOCK: %d", iblock);
 
@@ -1293,10 +1302,11 @@ int main(int argc, char* argv[]) {
 
   // TODO: put your code here, update az, ax, zy, nt, dt, then everything is supposed to be fine
   // TODO: you also need to interpolate full_*
-  run(Fwfl, Fdat, ss, rr, az, ax, ay, nt, dt, full_h_ro[0][0], full_h_c11[0][0], full_h_c22[0][0], full_h_c33[0][0], full_h_c44[0][0], full_h_c55[0][0], full_h_c66[0][0], full_h_c12[0][0], full_h_c13[0][0], full_h_c23[0][0], d_ww, ns, nr, nb, ngpu, jdata, jsnap, nbell, nc, interp, ssou,  dabc, snap, fsrf, verb);
+  run(Fwfl, Fdat, oldfdm, ss, rr, az, ax, ay, nt, dt, full_h_ro[0][0], full_h_c11[0][0], full_h_c22[0][0], full_h_c33[0][0], full_h_c44[0][0], full_h_c55[0][0], full_h_c66[0][0], full_h_c12[0][0], full_h_c13[0][0], full_h_c23[0][0], d_ww, ns, nr, nb, ngpu, jdata, jsnap, nbell, nc, interp, ssou,  dabc, snap, fsrf, verb);
 
   /*------------------------------------------------------------*/
   /* deallocate host arrays */
+  release_host_umo(h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
   free(ss); free(rr);
   free(**full_h_ro); free(*full_h_ro); free(full_h_ro);
   free(**full_h_c11); free(**full_h_c22); free(**full_h_c33); free(**full_h_c44); free(**full_h_c55); free(**full_h_c66); free(**full_h_c12); free(**full_h_c13); free(**full_h_c23);

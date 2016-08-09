@@ -124,12 +124,6 @@ static void x_b_e(int oldn, float oldo, float oldd, int newn, float newo,  float
   }
 }
 
-static void floorx(const float *x, float *k, int n) {
-  for (int i = 0; i < n; i++) {
-    k[i] = floorf(x[i]);
-  }
-}
-
 static void calc_t(const float *x, int *k, int *t, int n, int sinc_npts)
 {
   for (int i = 0; i < n; i++) {
@@ -178,78 +172,85 @@ void init_sinc_table(int nsinc, int npts)
   /*sf_floatwrite(gs_sinc_table[0], nsinc * npts, ftable);*/
 }
 
-void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, float ***newf, bool extend)
+
+void interpfield_(float ***oldf, float ***newf, bool extend,
+    int on1, float oo1, float od1,  /* old */
+    int on2, float oo2, float od2,
+    int on3, float oo3, float od3,
+    int nn1, float no1, float nd1,  /* new */
+    int nn2, float no2, float nd2,
+    int nn3, float no3, float nd3)
 {
-  float *x1 = sf_floatalloc(news->n1);
-  float *x2 = sf_floatalloc(news->n2);
-  float *x3 = sf_floatalloc(news->n3);
-  int b1 = news->n1;
-  int b2 = news->n2;
-  int b3 = news->n3;
+  float *x1 = sf_floatalloc(nn1);
+  float *x2 = sf_floatalloc(nn2);
+  float *x3 = sf_floatalloc(nn3);
+  int b1 = nn1;
+  int b2 = nn2;
+  int b3 = nn3;
   int e1 = 0;
   int e2 = 0;
   int e3 = 0;
   int ns = gs_ns;
 
-  memset(newf[0][0], 0, sizeof(float)*news->n1*news->n2*news->n3);
+  memset(newf[0][0], 0, sizeof(float)*nn1*nn2*nn3);
 
-  x_b_e(olds->n1, olds->o1, olds->d1, news->n1, news->o1, news->d1, x1, &b1, &e1);
-  x_b_e(olds->n2, olds->o2, olds->d2, news->n2, news->o2, news->d2, x2, &b2, &e2);
-  x_b_e(olds->n3, olds->o3, olds->d3, news->n3, news->o3, news->d3, x3, &b3, &e3);
+  x_b_e(on1, oo1, od1, nn1, no1, nd1, x1, &b1, &e1);
+  x_b_e(on2, oo2, od2, nn2, no2, nd2, x2, &b2, &e2);
+  x_b_e(on3, oo3, od3, nn3, no3, nd3, x3, &b3, &e3);
 
   /*sf_warning("b1,b2,b3: %d, %d, %d", b1, b2, b3);*/
   /*sf_warning("e1,e2,e3: %d, %d, %d", e1, e2, e3);*/
-  /*for (int i = 0; i < news->n3; i++) {*/
+  /*for (int i = 0; i < nn3; i++) {*/
     /*sf_warning("%f", x3[i]);*/
   /*}*/
 
-  int *k1  = sf_intalloc(news->n1); assert(k1);
-  int *k2  = sf_intalloc(news->n2);
-  int *k3  = sf_intalloc(news->n3);
-  int *t1    = sf_intalloc(news->n1);
-  int *t2    = sf_intalloc(news->n2);
-  int *t3    = sf_intalloc(news->n3);
-  int **c1 = sf_intalloc2(ns, news->n1);
-  int **c2 = sf_intalloc2(ns, news->n2);
-  int **c3 = sf_intalloc2(ns, news->n3);
+  int *k1  = sf_intalloc(nn1); assert(k1);
+  int *k2  = sf_intalloc(nn2);
+  int *k3  = sf_intalloc(nn3);
+  int *t1    = sf_intalloc(nn1);
+  int *t2    = sf_intalloc(nn2);
+  int *t3    = sf_intalloc(nn3);
+  int **c1 = sf_intalloc2(ns, nn1);
+  int **c2 = sf_intalloc2(ns, nn2);
+  int **c3 = sf_intalloc2(ns, nn3);
 
-  calc_t(x1, k1, t1, news->n1, gs_npts);
-  calc_t(x2, k2, t2, news->n2, gs_npts);
-  calc_t(x3, k3, t3, news->n3, gs_npts);
+  calc_t(x1, k1, t1, nn1, gs_npts);
+  calc_t(x2, k2, t2, nn2, gs_npts);
+  calc_t(x3, k3, t3, nn3, gs_npts);
 
 
-  up_clip(t1, news->n1, gs_npts - 1);
-  up_clip(t2, news->n2, gs_npts - 1);
-  up_clip(t3, news->n3, gs_npts - 1);
+  up_clip(t1, nn1, gs_npts - 1);
+  up_clip(t2, nn2, gs_npts - 1);
+  up_clip(t3, nn3, gs_npts - 1);
 
-  /*sf_warning("sumk1, sumk2, sumk3: %d, %d, %d", isum1(k1,news->n1), isum1(k2,news->n2), isum1(k3, news->n3));*/
-  /*sf_warning("sumt1, sumt2, sumt3: %d, %d, %d", isum1(t1,news->n1), isum1(t2,news->n2), isum1(t3, news->n3));*/
+  /*sf_warning("sumk1, sumk2, sumk3: %d, %d, %d", isum1(k1,nn1), isum1(k2,nn2), isum1(k3, nn3));*/
+  /*sf_warning("sumt1, sumt2, sumt3: %d, %d, %d", isum1(t1,nn1), isum1(t2,nn2), isum1(t3, nn3));*/
 
   for (int is = 0; is < ns; is++) {
-    for (int i1 = 0; i1 < news->n1; i1++) {
+    for (int i1 = 0; i1 < nn1; i1++) {
       c1[i1][is] = k1[i1] - 4 + is;
     }
-    for (int i2 = 0; i2 < news->n2; i2++) {
+    for (int i2 = 0; i2 < nn2; i2++) {
       c2[i2][is] = k2[i2] - 4 + is;
     }
-    for (int i3 = 0; i3 < news->n3; i3++) {
+    for (int i3 = 0; i3 < nn3; i3++) {
       c3[i3][is] = k3[i3] - 4 + is;
     }
   }
 
-  updown_cip(c1, ns, news->n1, 0, olds->n1-1);
-  updown_cip(c2, ns, news->n2, 0, olds->n2-1);
-  updown_cip(c3, ns, news->n3, 0, olds->n3-1);
+  updown_cip(c1, ns, nn1, 0, on1-1);
+  updown_cip(c2, ns, nn2, 0, on2-1);
+  updown_cip(c3, ns, nn3, 0, on3-1);
 
   /*for (int i = 0; i < ns; i++) {*/
     /*sf_warning("c1[0][%d]: %d", i, c1[0][i]);*/
   /*}*/
   /*sf_warning("write c1, c2, c3");*/
-  /*write2di("c1.rsf", c1, ns, news->n1);*/
-  /*write2di("c2.rsf", c2, ns, news->n2);*/
-  /*write2di("c3.rsf", c3, ns, news->n3);*/
+  /*write2di("c1.rsf", c1, ns, nn1);*/
+  /*write2di("c2.rsf", c2, ns, nn2);*/
+  /*write2di("c3.rsf", c3, ns, nn3);*/
 
-  /*write1di("t1.rsf", t1, news->n1);*/
+  /*write1di("t1.rsf", t1, nn1);*/
   /*exit(0);*/
 
   if (extend) {
@@ -257,9 +258,9 @@ void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-    for (int i3 = 0; i3 < news->n3; i3++) {
-      for (int i2 = 0; i2 < news->n2; i2++) {
-        for (int i1 = 0; i1 < news->n1; i1++) {
+    for (int i3 = 0; i3 < nn3; i3++) {
+      for (int i2 = 0; i2 < nn2; i2++) {
+        for (int i1 = 0; i1 < nn1; i1++) {
           for (int ic = 0; ic < ns; ic++) {
             for (int ib = 0; ib < ns; ib++) {
               for (int ia = 0; ia < ns; ia++) {

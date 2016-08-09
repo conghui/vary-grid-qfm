@@ -7,6 +7,17 @@ static float gs_w0;
 static float gs_qfact;
 static float gs_gamma;
 
+static void interpfield(const modeling_t *olds, const modeling_t *news, float ***oldf, float ***newf, bool extend)
+{
+  interpfield_(oldf, newf, extend,
+    olds->n1, olds->o1, olds->d1,  /* old */
+    olds->n2, olds->o2, olds->d2,
+    olds->n3, olds->o3, olds->d3,
+    news->n1, news->o1, news->d1,  /* new */
+    news->n2, news->o2, news->d2,
+    news->n3, news->o3, news->d3);
+}
+
 modeling_t make_modeling(const vel_t *v)
 {
   modeling_t m;
