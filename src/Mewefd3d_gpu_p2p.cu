@@ -15,6 +15,7 @@ extern "C" {
 #include "vel.h"
 #include "box.h"
 #include "resample.h"
+#include "check.h"
 }
 
 #include "ewefd3d_kernels.h"
@@ -22,8 +23,184 @@ extern "C" {
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #define NOP 4 /* derivative operator half-size */
 
+static void scatter_to_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h_uz, float **d_uox, float **d_uoy, float **d_uoz, float ***uox, float ***uoy, float ***uoz, int nyinterior, int ngpu)
+{
+  for (int y = 0; y < nyinterior; y++){
+    for (int z = 0; z < fdm->nzpad; z++){
+      for (int x = 0; x < fdm->nxpad; x++){
+         h_ux[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x] = uox[y][x][z];
+         h_uy[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x] = uoy[y][x][z];
+         h_uz[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x] = uoz[y][x][z];
+      }
+    }
+  }
+  cudaMemcpy(d_uox[0], h_ux, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+  cudaMemcpy(d_uoy[0], h_uy, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+  cudaMemcpy(d_uoz[0], h_uz, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
 
-fdm3d clonefdm(const fdm3d &fdm)
+
+  // write other GPU's portions of wavefield data into output arrays
+  for (int g = 1; g < ngpu; g++){
+
+    for (int y = 0; y < nyinterior; y++){
+      for (int z = 0; z < fdm->nzpad; z++){
+        for (int x = 0; x < fdm->nxpad; x++){
+           h_ux[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x] = uox[g * nyinterior + y][x][z];
+           h_uy[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x] = uoy[g * nyinterior + y][x][z];
+           h_uz[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x] = uoz[g * nyinterior + y][x][z];
+        }
+      }
+    }
+
+    cudaMemcpy(d_uox[g] + 4 * fdm->nzpad * fdm->nxpad, h_ux, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_uoy[g] + 4 * fdm->nzpad * fdm->nxpad, h_uy, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_uoz[g] + 4 * fdm->nzpad * fdm->nxpad, h_uz, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+  }
+}
+
+static void gather_from_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h_uz, float **d_uox, float **d_uoy, float **d_uoz, float ***uox, float ***uoy, float ***uoz, int nyinterior, int ngpu)
+{
+  cudaMemcpy(h_ux, d_uox[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+  cudaMemcpy(h_uy, d_uoy[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+  cudaMemcpy(h_uz, d_uoz[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+  for (int y = 0; y < nyinterior; y++){
+    for (int z = 0; z < fdm->nzpad; z++){
+      for (int x = 0; x < fdm->nxpad; x++){
+        uox[y][x][z] = h_ux[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
+        uoy[y][x][z] = h_uy[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
+        uoz[y][x][z] = h_uz[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
+      }
+    }
+  }
+
+
+  // write other GPU's portions of wavefield data into output arrays
+  for (int g = 1; g < ngpu; g++){
+    cudaMemcpy(h_ux, d_uox[g] + 4 * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(h_uy, d_uoy[g] + 4 * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(h_uz, d_uoz[g] + 4 * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+
+    for (int y = 0; y < nyinterior; y++){
+      for (int z = 0; z < fdm->nzpad; z++){
+        for (int x = 0; x < fdm->nxpad; x++){
+          uox[g * nyinterior + y][x][z] = h_ux[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
+          uoy[g * nyinterior + y][x][z] = h_uy[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
+          uoz[g * nyinterior + y][x][z] = h_uz[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
+        }
+      }
+    }
+  }
+}
+
+static void init_host_den_vel(const fdm3d &fdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
+{
+  int bytes = fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float);
+  h_ro  = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_ro [0][0], full_h_ro [0][0], bytes);
+  h_c11 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c11[0][0], full_h_c11[0][0], bytes);
+  h_c22 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c22[0][0], full_h_c22[0][0], bytes);
+  h_c33 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c33[0][0], full_h_c33[0][0], bytes);
+  h_c44 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c44[0][0], full_h_c44[0][0], bytes);
+  h_c55 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c55[0][0], full_h_c55[0][0], bytes);
+  h_c66 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c66[0][0], full_h_c66[0][0], bytes);
+  h_c12 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c12[0][0], full_h_c12[0][0], bytes);
+  h_c13 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c13[0][0], full_h_c13[0][0], bytes);
+  h_c23 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c23[0][0], full_h_c23[0][0], bytes);
+}
+
+static void release_host_den_vel(float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
+{
+  free(**h_ro); free(*h_ro); free(h_ro);
+  free(**h_c11); free(*h_c11); free(h_c11);
+  free(**h_c22); free(*h_c22); free(h_c22);
+  free(**h_c33); free(*h_c33); free(h_c33);
+  free(**h_c44); free(*h_c44); free(h_c44);
+  free(**h_c55); free(*h_c55); free(h_c55);
+  free(**h_c66); free(*h_c66); free(h_c66);
+  free(**h_c12); free(*h_c12); free(h_c12);
+  free(**h_c13); free(*h_c13); free(h_c13);
+  free(**h_c23); free(*h_c23); free(h_c23);
+}
+
+bool checksame(const fdm3d &a, const fdm3d &b) {
+ return a->nzpad == b->nzpad && a->nxpad == b->nxpad &&  a->nypad == b->nypad &&
+        a->oz == b->oz &&  a->ox == b->ox &&  a->oy == b->oy &&
+        a->dz == b->dz &&  a->dx == b->dx &&  a->dy == b->dy;
+}
+
+static void interp_wavefield(const fdm3d &oldfdm, const fdm3d &newfdm, float ***&u)
+{
+  if (checksame(oldfdm, newfdm)) {
+    sf_warning("old and new dimensions for wavefields are the same, don't need interpolatin");
+    return;
+  }
+
+  float ***nu = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  interpfield_(u, nu, false,
+    oldfdm->nzpad, oldfdm->oz, oldfdm->dz,  /* old */
+    oldfdm->nxpad, oldfdm->ox, oldfdm->dx,
+    oldfdm->nypad, oldfdm->oy, oldfdm->dy,
+    newfdm->nzpad, newfdm->oz, newfdm->dz,  /* new */
+    newfdm->nxpad, newfdm->ox, newfdm->dx,
+    newfdm->nypad, newfdm->oy, newfdm->dy);
+
+  free(**u); free(*u); free(u);
+  u = nu;
+}
+
+static void interp_wavefield_force(const fdm3d &oldfdm, const fdm3d &newfdm, float ***u, float ***nu)
+{
+  interpfield_(u, nu, false,
+    oldfdm->nzpad, oldfdm->oz, oldfdm->dz,  /* old */
+    oldfdm->nxpad, oldfdm->ox, oldfdm->dx,
+    oldfdm->nypad, oldfdm->oy, oldfdm->dy,
+    newfdm->nzpad, newfdm->oz, newfdm->dz,  /* new */
+    newfdm->nxpad, newfdm->ox, newfdm->dx,
+    newfdm->nypad, newfdm->oy, newfdm->dy);
+}
+
+static void interp_den_vel(const fdm3d &oldfdm, const fdm3d &newfdm, float ***oldf, float ***&newf)
+{
+  if (checksame(oldfdm, newfdm)) {
+    sf_warning("old and new dimensions for den/vel are the same, don't need interpolatin");
+    return;
+  }
+  float ***nu = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  interpfield_(oldf, nu, false,
+    oldfdm->nzpad, oldfdm->oz, oldfdm->dz,  /* old */
+    oldfdm->nxpad, oldfdm->ox, oldfdm->dx,
+    oldfdm->nypad, oldfdm->oy, oldfdm->dy,
+    newfdm->nzpad, newfdm->oz, newfdm->dz,  /* new */
+    newfdm->nxpad, newfdm->ox, newfdm->dx,
+    newfdm->nypad, newfdm->oy, newfdm->dy);
+
+  free(**newf); free(*newf); free(newf);
+  newf = nu;
+}
+
+static void interp_host_umo(const fdm3d &oldfdm, const fdm3d &newfdm, float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
+{
+  interp_wavefield(oldfdm, newfdm, h_umx);
+  interp_wavefield(oldfdm, newfdm, h_umy);
+  interp_wavefield(oldfdm, newfdm, h_umz);
+  interp_wavefield(oldfdm, newfdm, h_uox);
+  interp_wavefield(oldfdm, newfdm, h_uoy);
+  interp_wavefield(oldfdm, newfdm, h_uoz);
+}
+
+static void interp_host_den_vel(const fdm3d &oldfdm, const fdm3d &newfdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
+{
+  interp_den_vel(oldfdm, newfdm, full_h_ro, h_ro);
+  interp_den_vel(oldfdm, newfdm, full_h_c11, h_c11);
+  interp_den_vel(oldfdm, newfdm, full_h_c22, h_c22);
+  interp_den_vel(oldfdm, newfdm, full_h_c33, h_c33);
+  interp_den_vel(oldfdm, newfdm, full_h_c44, h_c44);
+  interp_den_vel(oldfdm, newfdm, full_h_c55, h_c55);
+  interp_den_vel(oldfdm, newfdm, full_h_c66, h_c66);
+  interp_den_vel(oldfdm, newfdm, full_h_c12, h_c12);
+  interp_den_vel(oldfdm, newfdm, full_h_c13, h_c13);
+  interp_den_vel(oldfdm, newfdm, full_h_c23, h_c23);
+}
+static fdm3d clonefdm(const fdm3d &fdm)
 {
   sf_axis az = sf_maxa(fdm->nz, fdm->oz, fdm->dz);
   sf_axis ax = sf_maxa(fdm->nx, fdm->ox, fdm->dx);
@@ -443,7 +620,7 @@ static void setup_boundary(const fdm3d fdm, float **&d_bzl_s, float **&d_bzh_s, 
   /*------------------------------------------------------------*/
 }
 
-static void init_wfd_array(const fdm3d &fdm, float **&d_umx, float **&d_uox, float **&d_upx, float **&d_uax, float **&d_utx, float **&d_umy, float **&d_uoy, float **&d_upy, float **&d_uay, float **&d_uty, float **&d_umz, float **&d_uoz, float **&d_upz, float **&d_uaz, float **&d_utz, float **&d_tzz, float **&d_txx, float **&d_tyy, float **&d_txy, float **&d_tyz, float **&d_tzx, const int *nylocal, int ngpu)
+static void init_wfd_array(const fdm3d &fdm, float *h_ux, float *h_uy, float *h_uz, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, float **&d_umx, float **&d_uox, float **&d_upx, float **&d_uax, float **&d_utx, float **&d_umy, float **&d_uoy, float **&d_upy, float **&d_uay, float **&d_uty, float **&d_umz, float **&d_uoz, float **&d_upz, float **&d_uaz, float **&d_utz, float **&d_tzz, float **&d_txx, float **&d_tyy, float **&d_txy, float **&d_tyz, float **&d_tzx, const int *nylocal, int ngpu, int nyinterior)
 {
   /*------------------------------------------------------------*/
   /* displacement: um = U @ t-1; uo = U @ t; up = U @ t+1 */
@@ -525,6 +702,9 @@ static void init_wfd_array(const fdm3d &fdm, float **&d_umx, float **&d_uox, flo
 
     sf_check_gpu_error("initialize grid arrays");
   }
+
+  scatter_to_gpu(fdm, h_ux, h_uy, h_uz, d_umx, d_umy, d_umz, h_umx, h_umy, h_umz, nyinterior, ngpu);
+  scatter_to_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, h_uox, h_uoy, h_uoz, nyinterior, ngpu);
 }
 static void precompute(const fdm3d &fdm, float **&d_ro, float dt, int nyinterior, int ngpu)
 {
@@ -540,7 +720,7 @@ static void precompute(const fdm3d &fdm, float **&d_ro, float dt, int nyinterior
   sf_check_gpu_error("computeRo Kernel");
 }
 
-static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d fdm, float **d_umx, float **d_uox, float **d_upx, float **d_uax, float **d_utx, float **d_umy, float **d_uoy, float **d_upy, float **d_uay, float **d_uty, float **d_umz, float **d_uoz, float **d_upz, float **d_uaz, float **d_utz, float **d_tzz, float **d_txx, float **d_tyy, float **d_txy, float **d_tyz, float **d_tzx, float **d_c11, float **d_c22, float **d_c33, float **d_c44, float **d_c55, float **d_c66, float **d_c12, float **d_c13, float **d_c23, float **d_Sw000, float **d_Sw001, float **d_Sw010, float **d_Sw011, float **d_Sw100, float **d_Sw101, float **d_Sw110, float **d_Sw111, int **d_Sjz, int **d_Sjx, int **d_Sjy, float **d_Rw000, float **d_Rw001, float **d_Rw010, float **d_Rw011, float **d_Rw100, float **d_Rw101, float **d_Rw110, float **d_Rw111, int **d_Rjz, int **d_Rjx, int **d_Rjy, float **d_bell, float **d_ww, float **d_ro, float **d_bzl_s, float **d_bzh_s, float **d_bxl_s, float **d_bxh_s, float **d_byl_s, float **d_byh_s, float *** uoz, float *** uox, float *** uoy, float *h_uoz, float *h_uox, float *h_uoy, float ***uc, float *h_dd, float *h_dd_combined, float **d_dd, sf_axis az, sf_axis ax, sf_axis ay, const int *nylocal, float spo, float idx, float idy, float idz, int nt, int jsnap, int jdata, int ngpu, int nyinterior, int ns, int nr, int nbell, int nc, bool interp, bool snap, bool fsrf, bool ssou, bool dabc, bool verb)
+static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullfdm, float **d_umx, float **d_uox, float **d_upx, float **d_uax, float **d_utx, float **d_umy, float **d_uoy, float **d_upy, float **d_uay, float **d_uty, float **d_umz, float **d_uoz, float **d_upz, float **d_uaz, float **d_utz, float **d_tzz, float **d_txx, float **d_tyy, float **d_txy, float **d_tyz, float **d_tzx, float **d_c11, float **d_c22, float **d_c33, float **d_c44, float **d_c55, float **d_c66, float **d_c12, float **d_c13, float **d_c23, float **d_Sw000, float **d_Sw001, float **d_Sw010, float **d_Sw011, float **d_Sw100, float **d_Sw101, float **d_Sw110, float **d_Sw111, int **d_Sjz, int **d_Sjx, int **d_Sjy, float **d_Rw000, float **d_Rw001, float **d_Rw010, float **d_Rw011, float **d_Rw100, float **d_Rw101, float **d_Rw110, float **d_Rw111, int **d_Rjz, int **d_Rjx, int **d_Rjy, float **d_bell, float **d_ww, float **d_ro, float **d_bzl_s, float **d_bzh_s, float **d_bxl_s, float **d_bxh_s, float **d_byl_s, float **d_byh_s, float *** uoz, float *** uox, float *** uoy, float *h_uz, float *h_ux, float *h_uy, float ***uc, float *h_dd, float *h_dd_combined, float **d_dd, sf_axis az, sf_axis ax, sf_axis ay, const int *nylocal, float spo, float idx, float idy, float idz, int nt, int jsnap, int jdata, int ngpu, int nyinterior, int ns, int nr, int nbell, int nc, bool interp, bool snap, bool fsrf, bool ssou, bool dabc, bool verb)
 {
   int nb = fdm->nb;
   int nx = fdm->nx;
@@ -848,48 +1028,28 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d fdm, float **d_umx
     /*------------------------------------------------------------*/
     if(snap && it%jsnap==0) {
 
-      // write GPU 0's portion of the wavefield into output arrays
-      cudaMemcpy(h_uox, d_uox[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
-      cudaMemcpy(h_uoy, d_uoy[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
-      cudaMemcpy(h_uoz, d_uoz[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
-      for (int y = 0; y < nyinterior; y++){
-        for (int z = 0; z < fdm->nzpad; z++){
-          for (int x = 0; x < fdm->nxpad; x++){
-            uox[y][x][z] = h_uox[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
-            uoy[y][x][z] = h_uoy[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
-            uoz[y][x][z] = h_uoz[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
-          }
-        }
-      }
+      gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, uox, uoy, uoz, nyinterior, ngpu);
 
-
-      // write other GPU's portions of wavefield data into output arrays
-      for (int g = 1; g < ngpu; g++){
-        cudaMemcpy(h_uox, d_uox[g] + 4 * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
-        cudaMemcpy(h_uoy, d_uoy[g] + 4 * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
-        cudaMemcpy(h_uoz, d_uoz[g] + 4 * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
-
-        for (int y = 0; y < nyinterior; y++){
-          for (int z = 0; z < fdm->nzpad; z++){
-            for (int x = 0; x < fdm->nxpad; x++){
-              uox[g * nyinterior + y][x][z] = h_uox[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
-              uoy[g * nyinterior + y][x][z] = h_uoy[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
-              uoz[g * nyinterior + y][x][z] = h_uoz[y * fdm->nzpad * fdm->nxpad + z * fdm->nxpad + x];
-            }
-          }
-        }
-      }
+      float ***nuc = sf_floatalloc3(fullfdm->nzpad, fullfdm->nxpad, fullfdm->nypad);
 
       // Write wavefield arrays to output file
       cut3d(uoz,uc,fdm,az,ax,ay);
-      sf_floatwrite(uc[0][0],sf_n(ax)*sf_n(ay)*sf_n(az),Fwfl);
+      interp_wavefield_force(fdm, fullfdm, uc, nuc);
+      sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+
+      //if (it != 0) {
+        //write3dfdm("ooz.rsf", uoz, fullfdm);
+      //}
 
       cut3d(uox,uc,fdm,az,ax,ay);
-      sf_floatwrite(uc[0][0],sf_n(ax)*sf_n(ay)*sf_n(az),Fwfl);
+      interp_wavefield_force(fdm, fullfdm, uc, nuc);
+      sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
 
       cut3d(uoy,uc,fdm,az,ax,ay);
-      sf_floatwrite(uc[0][0],sf_n(ax)*sf_n(ay)*sf_n(az),Fwfl);
+      interp_wavefield_force(fdm, fullfdm, uc, nuc);
+      sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
 
+      free(**nuc); free(*nuc); free(nuc);
     }
 
     /*------------------------------------------------------------*/
@@ -976,15 +1136,15 @@ static void make_axis(modeling_t *m, sf_axis &az, sf_axis &ax, sf_axis &ay)
   ay = sf_maxa(m->n3 - 2 * m->nb, m->o3 + m->nb * m->d3, m->d3);
 }
 
-static void run(sf_file Fwfl, sf_file Fdat, fdm3d &oldfdm, pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float **d_ww, int ns, int nr, int nb, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb)
+static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullfdm, pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, float **d_ww, int ns, int nr, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb)
 {
 
   /*------------------------------------------------------------*/
   // used for writing wavefield to file, only needed if snap=y
-  float ***uox, ***uoy, ***uoz;
-  float *h_uox, *h_uoy, *h_uoz;
-  uox = uoy = uoz = NULL;
-  h_uox = h_uoy = h_uoz = NULL;
+  float ***ux, ***uy, ***uz;
+  float *h_ux, *h_uy, *h_uz;
+  ux = uy = uz = NULL;
+  h_ux = h_uy = h_uz = NULL;
 
   /* wavefield cut params */
   float     ***uc=NULL;
@@ -999,7 +1159,6 @@ static void run(sf_file Fwfl, sf_file Fdat, fdm3d &oldfdm, pt3d *ss, pt3d *rr, s
 
   // TODO: put time block stuff here
   /* expand domain for FD operators and ABC */
-  fdm3d fdm=fdutil3d_init(verb,fsrf,az,ax,ay,nb,1);
   update_axis(fdm, az, ax, ay, verb);
 
   /*------------------------------------------------------------*/
@@ -1008,7 +1167,7 @@ static void run(sf_file Fwfl, sf_file Fdat, fdm3d &oldfdm, pt3d *ss, pt3d *rr, s
   int *nylocal = (int*)malloc(ngpu*sizeof(int));  // size of sub-domains in y-dimension INCLUDING any ghost cells from adjacent GPUs
   set_nylocal(fdm, nylocal, ngpu, nyinterior);
   check_zx_dim(fdm, ngpu);
-  if(snap) { alloc_wlf(fdm, uoz, uox, uoy, h_uoz, h_uox, h_uoy, uc, nyinterior); }
+  if(snap) { alloc_wlf(fdm, uz, ux, uy, h_uz, h_ux, h_uy, uc, nyinterior); }
   float **d_Sw000,  **d_Sw001,  **d_Sw010,  **d_Sw011,  **d_Sw100,  **d_Sw101,  **d_Sw110,  **d_Sw111;
   float **d_Rw000,  **d_Rw001,  **d_Rw010,  **d_Rw011,  **d_Rw100,  **d_Rw101,  **d_Rw110,  **d_Rw111;
   int **d_Sjz,  **d_Sjx,  **d_Sjy;
@@ -1029,7 +1188,7 @@ static void run(sf_file Fwfl, sf_file Fdat, fdm3d &oldfdm, pt3d *ss, pt3d *rr, s
   setup_boundary(fdm, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s, h_ro, h_c55, spo, nyinterior, ngpu, dt, dabc);
 
   float **d_umx,  **d_uox,  **d_upx,  **d_uax,  **d_utx,  **d_umy,  **d_uoy,  **d_upy,  **d_uay,  **d_uty,  **d_umz,  **d_uoz,  **d_upz,  **d_uaz,  **d_utz,  **d_tzz,  **d_txx,  **d_tyy,  **d_txy,  **d_tyz,  **d_tzx;
-  init_wfd_array(fdm, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, nylocal, ngpu);
+  init_wfd_array(fdm, h_ux, h_uy, h_uz, h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, nylocal, ngpu, nyinterior);
 
   precompute(fdm, d_ro, dt, nyinterior, ngpu);
 
@@ -1039,22 +1198,22 @@ static void run(sf_file Fwfl, sf_file Fdat, fdm3d &oldfdm, pt3d *ss, pt3d *rr, s
    *  MAIN LOOP
    */
   /*------------------------------------------------------------*/
-  main_loop(Fwfl, Fdat, fdm, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, d_bell, d_ww, d_ro, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s,  uoz,  uox,  uoy, h_uoz, h_uox, h_uoy, uc, h_dd, h_dd_combined, d_dd, az, ax, ay, nylocal, spo, idx, idy, idz, nt, jsnap, jdata, ngpu, nyinterior, ns, nr, nbell, nc, interp, snap, fsrf, ssou, dabc, verb);
+  main_loop(Fwfl, Fdat, fdm, fullfdm, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, d_bell, d_ww, d_ro, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s,  uz,  ux,  uy, h_uz, h_ux, h_uy, uc, h_dd, h_dd_combined, d_dd, az, ax, ay, nylocal, spo, idx, idy, idz, nt, jsnap, jdata, ngpu, nyinterior, ns, nr, nbell, nc, interp, snap, fsrf, ssou, dabc, verb);
+
+  gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_umx, d_umy, d_umz, h_umx, h_umy, h_umz, nyinterior, ngpu);
+  gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, h_uox, h_uoy, h_uoz, nyinterior, ngpu);
 
   /*------------------------------------------------------------*/
   /* deallocate host arrays */
 
   free(h_dd); free(h_dd_combined);
-  //free(ss); free(rr);
-  //free(h_ro);
-  //free(h_c11); free(h_c22); free(h_c33); free(h_c44); free(h_c55); free(h_c66); free(h_c12); free(h_c13); free(h_c23);
 
   if (snap){
-    free(h_uoz); free(h_uox); free(h_uoy);
+    free(h_uz); free(h_ux); free(h_uy);
     free(**uc);  free(*uc);  free(uc);
-    free(**uoz); free(*uoz); free(uoz);
-    free(**uox); free(*uox); free(uox);
-    free(**uoy); free(*uoy); free(uoy);
+    free(**uz); free(*uz); free(uz);
+    free(**ux); free(*ux); free(ux);
+    free(**uy); free(*uy); free(uy);
   }
 
 
@@ -1289,6 +1448,10 @@ int main(int argc, char* argv[]) {
   float ***h_umx, ***h_uox,  ***h_umy,  ***h_uoy,  ***h_umz,  ***h_uoz;
   init_host_umo(oldfdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
 
+  // initialize varying density and velocity
+  float ***h_ro, ***h_c11, ***h_c22, ***h_c33, ***h_c44, ***h_c55, ***h_c66, ***h_c12, ***h_c13, ***h_c23;
+  init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+
   for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
     sf_warning("FORWARD BLOCK: %d", iblock);
 
@@ -1302,11 +1465,17 @@ int main(int argc, char* argv[]) {
 
   // TODO: put your code here, update az, ax, zy, nt, dt, then everything is supposed to be fine
   // TODO: you also need to interpolate full_*
-  run(Fwfl, Fdat, oldfdm, ss, rr, az, ax, ay, nt, dt, full_h_ro[0][0], full_h_c11[0][0], full_h_c22[0][0], full_h_c33[0][0], full_h_c44[0][0], full_h_c55[0][0], full_h_c66[0][0], full_h_c12[0][0], full_h_c13[0][0], full_h_c23[0][0], d_ww, ns, nr, nb, ngpu, jdata, jsnap, nbell, nc, interp, ssou,  dabc, snap, fsrf, verb);
+  fdm3d fdm=fdutil3d_init(verb,fsrf,az,ax,ay,nb,1);
+
+  interp_host_den_vel(oldfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+  interp_host_umo(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
+
+  run(Fwfl, Fdat, fdm, fullfdm, ss, rr, az, ax, ay, nt, dt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, d_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb);
 
   /*------------------------------------------------------------*/
   /* deallocate host arrays */
   release_host_umo(h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
+  release_host_den_vel(h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
   free(ss); free(rr);
   free(**full_h_ro); free(*full_h_ro); free(full_h_ro);
   free(**full_h_c11); free(**full_h_c22); free(**full_h_c33); free(**full_h_c44); free(**full_h_c55); free(**full_h_c66); free(**full_h_c12); free(**full_h_c13); free(**full_h_c23);

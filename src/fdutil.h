@@ -3,6 +3,7 @@
 #ifndef _fdutil_h
 #define _fdutil_h
 
+#include <rsf.h>
 
 typedef struct fdm2 *fdm2d;
 
