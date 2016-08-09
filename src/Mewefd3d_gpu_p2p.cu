@@ -45,6 +45,7 @@ extern "C" {
 #include "fdutil.h"
 #include "vel.h"
 #include "box.h"
+#include "resample.h"
 }
 
 #include "ewefd3d_kernels.h"
@@ -261,37 +262,38 @@ static void setup_fd_cooef(const fdm3d &fdm, float &idz, float &idx, float &idy)
   /*------------------------------------------------------------*/
 }
 
-static void read_density_velocity(sf_file &Fden, sf_file &Fccc, const fdm3d &fdm, float *&h_ro, float *&h_c11, float *&h_c22, float *&h_c33, float *&h_c44, float *&h_c55, float *&h_c66, float *&h_c12, float *&h_c13, float *&h_c23, int nz, int nx, int ny)
+static void read_density_velocity(sf_file &Fden, sf_file &Fccc, const fdm3d &fdm, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23, int nz, int nx, int ny)
 {
   /*------------------------------------------------------------*/
   /* read in model density and stiffness arrays */
-  float *tt1 = (float*)malloc(nz*nx*ny*sizeof(float));
+  float ***tt1 = sf_floatalloc3(nz, nx, ny);
 
   /* input density */
-  h_ro = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  sf_floatread(tt1,nz*nx*ny,Fden);     expand_cpu(tt1, h_ro, fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  h_ro = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fden);     expand_cpu(tt1[0][0], h_ro[0][0], fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
 
   /* input stiffness */
-  h_c11 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  h_c22 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  h_c33 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  h_c44 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  h_c55 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  h_c66 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  h_c12 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  h_c13 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  h_c23 = (float*)malloc(fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float));
-  sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c11,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
-  sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c22,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
-  sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c33,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
-  sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c44,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
-  sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c55,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
-  sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c66,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
-  sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c12,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
-  sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c13,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
-  sf_floatread(tt1,nz*nx*ny,Fccc);    expand_cpu(tt1,h_c23,fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
-  free(tt1);
+  h_c11 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  h_c22 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  h_c33 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  h_c44 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  h_c55 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  h_c66 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  h_c12 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  h_c13 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  h_c23 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fccc);    expand_cpu(tt1[0][0],h_c11[0][0],fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fccc);    expand_cpu(tt1[0][0],h_c22[0][0],fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fccc);    expand_cpu(tt1[0][0],h_c33[0][0],fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fccc);    expand_cpu(tt1[0][0],h_c44[0][0],fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fccc);    expand_cpu(tt1[0][0],h_c55[0][0],fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fccc);    expand_cpu(tt1[0][0],h_c66[0][0],fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fccc);    expand_cpu(tt1[0][0],h_c12[0][0],fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fccc);    expand_cpu(tt1[0][0],h_c13[0][0],fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  sf_floatread(tt1[0][0],nz*nx*ny,Fccc);    expand_cpu(tt1[0][0],h_c23[0][0],fdm->nb, nx, fdm->nxpad, ny, fdm->nypad, nz, fdm->nzpad);
+  free(**tt1); free(*tt1); free(tt1);
 }
+
 static void copy_den_vel_to_dev(const fdm3d &fdm, float **&d_ro , float **&d_c11, float **&d_c22, float **&d_c33, float **&d_c44, float **&d_c55, float **&d_c66, float **&d_c12, float **&d_c13, float **&d_c23, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, int nyinterior, int ngpu)
 {
   d_ro = (float**)malloc(ngpu*sizeof(float*));
@@ -964,6 +966,13 @@ static void set_nylocal(const fdm3d &fdm, int *nylocal, int ngpu, int nyinterior
   }
 }
 
+static void make_axis(modeling_t *m, sf_axis &az, sf_axis &ax, sf_axis &ay)
+{
+  az = sf_maxa(m->n1 - 2 * m->nb, m->o1 + m->nb * m->d1, m->d1);
+  ax = sf_maxa(m->n2 - 2 * m->nb, m->o2 + m->nb * m->d2, m->d2);
+  ay = sf_maxa(m->n3 - 2 * m->nb, m->o3 + m->nb * m->d3, m->d3);
+}
+
 static void run(sf_file Fwfl, sf_file Fdat, pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float **d_ww, int ns, int nr, int nb, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb)
 {
 
@@ -1230,7 +1239,7 @@ int main(int argc, char* argv[]) {
 
   setup_src_rcv_cord(Fsou, Frec, ss, rr, ns, nr);
 
-  float *full_h_ro,  *full_h_c11,  *full_h_c22,  *full_h_c33,  *full_h_c44,  *full_h_c55,  *full_h_c66,  *full_h_c12,  *full_h_c13,  *full_h_c23;
+  float ***full_h_ro,  ***full_h_c11,  ***full_h_c22,  ***full_h_c33,  ***full_h_c44,  ***full_h_c55,  ***full_h_c66,  ***full_h_c12,  ***full_h_c13,  ***full_h_c23;
   read_density_velocity(Fden, Fccc, totalfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, nz, nx, ny);
 
   sf_warning("begin conghui's code");
@@ -1266,15 +1275,32 @@ int main(int argc, char* argv[]) {
   sf_warning("vmin: %f, vmax: %f, dmin: %f, dmax: %f", vmin, vmax, dmin, dmax);
   times_t *times = read_times();
   init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact);
+  box_t *domain = calc_shot_box(vv0, times, ss, rr, nr, nt, dt);
+
+  init_sinc_table(8, 10000);
+  modeling_t initmodel = make_modeling(vv0);
+
+  for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
+    sf_warning("FORWARD BLOCK: %d", iblock);
+
+    sf_axis curaz = sf_maxa(1,1,1); // dummy, update later
+    sf_axis curax = sf_maxa(1,1,1); // dummy, update later
+    sf_axis curay = sf_maxa(1,1,1); // dummy, update later
+    modeling_t *cur = &domain->hyper[iblock];
+
+    make_axis(cur, curaz, curax, curay);
+  }
 
   // TODO: put your code here, update az, ax, zy, nt, dt, then everything is supposed to be fine
   // TODO: you also need to interpolate full_*
-  run(Fwfl, Fdat, ss, rr, az, ax, ay, nt, dt, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, d_ww, ns, nr, nb, ngpu, jdata, jsnap, nbell, nc, interp, ssou,  dabc, snap, fsrf, verb);
+  run(Fwfl, Fdat, ss, rr, az, ax, ay, nt, dt, full_h_ro[0][0], full_h_c11[0][0], full_h_c22[0][0], full_h_c33[0][0], full_h_c44[0][0], full_h_c55[0][0], full_h_c66[0][0], full_h_c12[0][0], full_h_c13[0][0], full_h_c23[0][0], d_ww, ns, nr, nb, ngpu, jdata, jsnap, nbell, nc, interp, ssou,  dabc, snap, fsrf, verb);
 
   /*------------------------------------------------------------*/
   /* deallocate host arrays */
   free(ss); free(rr);
-  free(full_h_ro);
+  free(**full_h_ro); free(*full_h_ro); free(full_h_ro);
+  free(**full_h_c11); free(**full_h_c22); free(**full_h_c33); free(**full_h_c44); free(**full_h_c55); free(**full_h_c66); free(**full_h_c12); free(**full_h_c13); free(**full_h_c23);
+  free(*full_h_c11); free(*full_h_c22); free(*full_h_c33); free(*full_h_c44); free(*full_h_c55); free(*full_h_c66); free(*full_h_c12); free(*full_h_c13); free(*full_h_c23);
   free(full_h_c11); free(full_h_c22); free(full_h_c33); free(full_h_c44); free(full_h_c55); free(full_h_c66); free(full_h_c12); free(full_h_c13); free(full_h_c23);
 
   /*------------------------------------------------------------*/

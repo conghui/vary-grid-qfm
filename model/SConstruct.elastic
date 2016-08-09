@@ -170,7 +170,7 @@ for m in ['VTI']:
         vp=${SOURCES[5]}
         times=${SOURCES[6]}
         ngpu=2 jdata=%(jdata)d verb=%(verb)s free=n ssou=%(ssou)s
-        opot=n snap=%(snap)s jsnap=%(jsnap)d
+        opot=n snap=%(snap)s jsnap=%(jsnap)d timeblocks=2
         dabc=%(dabc)s nb=%(nb)d nbell=%(nbell)d
         ''' %par)
 
