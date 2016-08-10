@@ -61,9 +61,11 @@ static void scatter_to_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h_
 
 static void gather_from_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h_uz, float **d_uox, float **d_uoy, float **d_uoz, float ***uox, float ***uoy, float ***uoz, int nyinterior, int ngpu)
 {
+  sf_warning("%s: cudaMemcpy", __PRETTY_FUNCTION__);
   cudaMemcpy(h_ux, d_uox[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
   cudaMemcpy(h_uy, d_uoy[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
   cudaMemcpy(h_uz, d_uoz[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+
   for (int y = 0; y < nyinterior; y++){
     for (int z = 0; z < fdm->nzpad; z++){
       for (int x = 0; x < fdm->nxpad; x++){
@@ -297,7 +299,7 @@ static void setup_output_data(sf_file &Fdat, sf_axis &at, const sf_axis &ar, con
 static void set_output_wfd(sf_file &Fwfl, sf_axis &at, const sf_axis &az, const sf_axis &ax, const sf_axis &ay, const sf_axis &ac, int nt, float dt, int jsnap, bool verb)
 {
   int ntsnap=0;
-  for(int it=0; it<nt; it++) {
+  for(int it=1; it<=nt; it++) {
     if(it%jsnap==0) ntsnap++;
   }
   sf_setn(at,  ntsnap);
@@ -324,7 +326,7 @@ static void alloc_wlf(const fdm3d &fdm, float *** &uoz, float *** &uox, float **
     uc=sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);
 
 }
-static float **init_wavelet(sf_file &Fwav, int ns, int nc, int nt, int ngpu)
+static float *init_wavelet(sf_file &Fwav, int ns, int nc, int nt)
 {
   /*------------------------------------------------------------*/
   /* read source wavelet(s) and copy to each GPU (into d_ww) */
@@ -340,6 +342,12 @@ static float **init_wavelet(sf_file &Fwav, int ns, int nc, int nt, int ngpu)
     }
   }
 
+
+  free(**ww); free(*ww); free(ww);
+  return h_ww;
+  /*------------------------------------------------------------*/
+}
+static float **copy_wavelet(const float *h_ww, int ns, int nc, int nt, int ngpu) {
   float **d_ww = (float**)malloc(ngpu*sizeof(float*));
   for (int g = 0; g < ngpu; g++){
     cudaSetDevice(g);
@@ -349,9 +357,7 @@ static float **init_wavelet(sf_file &Fwav, int ns, int nc, int nt, int ngpu)
     sf_check_gpu_error("copy source wavelet to device");
   }
 
-  free(**ww); free(*ww); free(ww);
   return d_ww;
-  /*------------------------------------------------------------*/
 }
 static void setup_output_array(float *&h_dd, float *&h_dd_combined, float **&d_dd, int ngpu, int nr, int nc)
 {
@@ -727,8 +733,8 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
   int nx = fdm->nx;
 
   if(verb) fprintf(stderr,"\n");
-  for (int it=0; it<nt; it++, total_iter++) {
-    if(verb) fprintf(stderr,"\b\b\b\b\b%d",it);
+  for (int it=1; it<=nt; it++, total_iter++) {
+    if(verb) fprintf(stderr,"\b\b\b\b\b%d", total_iter);
 
     /*------------------------------------------------------------*/
     /* from displacement to strain                                */
@@ -1028,19 +1034,16 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
     /*    - Step #9                       */
     /*------------------------------------------------------------*/
     if(snap && total_iter%jsnap==0) {
-
+      sf_warning("write wavefield files, total_iter: %d", total_iter);
       gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, uox, uoy, uoz, nyinterior, ngpu);
 
       float ***nuc = sf_floatalloc3(fullfdm->nzpad, fullfdm->nxpad, fullfdm->nypad);
 
       // Write wavefield arrays to output file
       cut3d(uoz,uc,fdm,az,ax,ay);
+      sf_warning("interpolate wavefields and dump them to disks");
       interp_wavefield_force(fdm, fullfdm, uc, nuc);
       sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
-
-      //if (it != 0) {
-        //write3dfdm("ooz.rsf", uoz, fullfdm);
-      //}
 
       cut3d(uox,uc,fdm,az,ax,ay);
       interp_wavefield_force(fdm, fullfdm, uc, nuc);
@@ -1154,7 +1157,7 @@ static void make_axis(const fdm3d &fullfdm, modeling_t *m, int ngpu, sf_axis &az
  *
  * It also output the wavefield and data
  */
-static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullfdm, pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, float **d_ww, int ns, int nr, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb, int &total_iter)
+static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullfdm, pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, const float *h_ww, int ns, int nr, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb, int &total_iter)
 {
 
   /*------------------------------------------------------------*/
@@ -1172,6 +1175,7 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
   float *h_dd, *h_dd_combined, **d_dd;
   setup_output_array(h_dd, h_dd_combined, d_dd, ngpu, nr, nc);
 
+  float **d_ww = copy_wavelet(h_ww, ns, nc, nt, ngpu);
   float **d_bell = setup_bell(nbell, ngpu);
   /*------------------------------------------------------------*/
 
@@ -1239,8 +1243,8 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
   /* deallocate GPU arrays */
 
   for (int g = 0; g < ngpu; g++){
-
-    //cudaFree(&d_ww[g]);
+    break;
+    cudaFree(&d_ww[g]);
     cudaFree(&d_dd[g]);
     cudaFree(&d_bell[g]);
 
@@ -1340,11 +1344,6 @@ int main(int argc, char* argv[]) {
   int ngpu;
   if (! sf_getint("ngpu", &ngpu)) ngpu = 1; /* how many local GPUs to use */
   sf_warning("using %d GPUs", ngpu);
-  for (int g = 0; g < ngpu; g++){
-    cudaSetDevice(g);
-    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-  }
-
 
   /*------------------------------------------------------------*/
   /* execution flags */
@@ -1408,7 +1407,7 @@ int main(int argc, char* argv[]) {
   sf_axis ac=sf_maxa(nc  ,0,1);
   setup_output_data(Fdat, at, ar, ac, nt, jdata, dt);
 
-  float **d_ww = init_wavelet(Fwav, ns, nc, nt, ngpu);
+  float *h_ww = init_wavelet(Fwav, ns, nc, nt);
 
   sf_axis full_az = sf_maxa(sf_n(az), sf_o(az), sf_d(az));
   sf_axis full_ax = sf_maxa(sf_n(ax), sf_o(ax), sf_d(ax));
@@ -1470,10 +1469,16 @@ int main(int argc, char* argv[]) {
   float ***h_ro, ***h_c11, ***h_c22, ***h_c33, ***h_c44, ***h_c55, ***h_c66, ***h_c12, ***h_c13, ***h_c23;
   init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
 
-  int total_iter = 0;
-  //for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
-  for (int iblock = 0; iblock < -1; iblock++) {
+  int total_iter = 1;
+  for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
     sf_warning("FORWARD BLOCK: %d", iblock);
+    sf_warning("init cuda device ...");
+    for (int g = 0; g < ngpu; g++){
+      cudaSetDevice(g);
+      cudaDeviceReset();
+      cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+    }
+    sf_warning("init cuda device finished");
 
     sf_axis curaz = sf_maxa(1,1,1); // dummy, update later
     sf_axis curax = sf_maxa(1,1,1); // dummy, update later
@@ -1489,26 +1494,12 @@ int main(int argc, char* argv[]) {
 
     fdm3d fdm=fdutil3d_init(verb,fsrf,curaz, curax, curay, nb,1);
 
-    interp_host_den_vel(oldfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+    sf_warning("iterpolating density and velocity");
+    interp_host_den_vel(fullfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
 
-    interp_host_umo(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
-
-    run(Fwfl, Fdat, fdm, fullfdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, d_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
+    run(Fwfl, Fdat, fdm, fullfdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, h_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
 
     oldfdm = clonefdm(fdm);
-
-    break;
-  }
-
-  if (true) {
-    fdm3d fdm=fdutil3d_init(verb,fsrf,az, ax, ay, nb,1);
-
-    interp_host_den_vel(oldfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
-
-    interp_host_umo(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
-
-    run(Fwfl, Fdat, fdm, fullfdm, ss, rr, az, ax, ay, 204, dt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, d_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
-
   }
 
   // TODO: put your code here, update az, ax, zy, nt, dt, then everything is supposed to be fine
@@ -1524,11 +1515,6 @@ int main(int argc, char* argv[]) {
   free(*full_h_c11); free(*full_h_c22); free(*full_h_c33); free(*full_h_c44); free(*full_h_c55); free(*full_h_c66); free(*full_h_c12); free(*full_h_c13); free(*full_h_c23);
   free(full_h_c11); free(full_h_c22); free(full_h_c33); free(full_h_c44); free(full_h_c55); free(full_h_c66); free(full_h_c12); free(full_h_c13); free(full_h_c23);
 
-  /*------------------------------------------------------------*/
-  /* deallocate GPU arrays */
-  for (int g = 0; g < ngpu; g++){
-    cudaFree(&d_ww[g]);
-  }
 
   sf_close();
   exit(0);

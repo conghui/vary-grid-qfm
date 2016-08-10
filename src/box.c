@@ -199,10 +199,10 @@ void init_box(int timeblocks, float vmin, float vmax, float dmin, float dmax, fl
 
 box_t *calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, const pt3d *rec3d, int nr, int nt, float dt) {
 
-  int i4 = (src3d->x - times->o4) / times->d4 + 0.5;
-  int i5 = (src3d->y - times->o5) / times->d5 + 0.5;
+  int i4 = (src3d->x - times->o4) / times->d4;
+  int i5 = (src3d->y - times->o5) / times->d5;
 
-  /*sf_warning("i4: %d, i5: %d", i4, i5);*/
+  sf_warning("i4: %d, i5: %d", i4, i5);
 
   float ***minT = sf_floatalloc3(times->n1, times->n2, times->n3);
   memcpy(minT[0][0], times->val[i5][i4][0][0],
@@ -210,8 +210,8 @@ box_t *calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, 
 
   sf_warning("say hello at: %s: %d", __FILE__, __LINE__);
   for (int i = 0; i < nr; i++) {
-    int i5 = fminf(fmaxf(round((rec3d[i].y - times->o5) / times->d5 + 0.5), 0), times->n5);
-    int i4 = fminf(fmaxf(round((rec3d[i].x - times->o4) / times->d4 + 0.5), 0), times->n4);
+    int i5 = fminf(fmaxf(round((rec3d[i].y - times->o5) / times->d5), 0), times->n5);
+    int i4 = fminf(fmaxf(round((rec3d[i].x - times->o4) / times->d4), 0), times->n4);
 
     /*sf_warning("i4, i5: %d, %d", i4, i5);*/
     for (int i3 = 0; i3 < times->n3; i3++) {
