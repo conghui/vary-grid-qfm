@@ -22,7 +22,7 @@ par = {
     'kt':100,'frq':10,
 
     # Modelling parameters
-    'snap':'y','jsnap':400,'nb':44, 'verb':'y',
+    'snap':'y','jsnap':200,'nb':44, 'verb':'y',
     'nbell':5, 'jdata':8,'ssou':'y',
 
     # Output

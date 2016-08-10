@@ -18,6 +18,7 @@ extern "C" {
 #include "check.h"
 }
 
+#include <assert.h>
 #include "ewefd3d_kernels.h"
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -720,13 +721,13 @@ static void precompute(const fdm3d &fdm, float **&d_ro, float dt, int nyinterior
   sf_check_gpu_error("computeRo Kernel");
 }
 
-static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullfdm, float **d_umx, float **d_uox, float **d_upx, float **d_uax, float **d_utx, float **d_umy, float **d_uoy, float **d_upy, float **d_uay, float **d_uty, float **d_umz, float **d_uoz, float **d_upz, float **d_uaz, float **d_utz, float **d_tzz, float **d_txx, float **d_tyy, float **d_txy, float **d_tyz, float **d_tzx, float **d_c11, float **d_c22, float **d_c33, float **d_c44, float **d_c55, float **d_c66, float **d_c12, float **d_c13, float **d_c23, float **d_Sw000, float **d_Sw001, float **d_Sw010, float **d_Sw011, float **d_Sw100, float **d_Sw101, float **d_Sw110, float **d_Sw111, int **d_Sjz, int **d_Sjx, int **d_Sjy, float **d_Rw000, float **d_Rw001, float **d_Rw010, float **d_Rw011, float **d_Rw100, float **d_Rw101, float **d_Rw110, float **d_Rw111, int **d_Rjz, int **d_Rjx, int **d_Rjy, float **d_bell, float **d_ww, float **d_ro, float **d_bzl_s, float **d_bzh_s, float **d_bxl_s, float **d_bxh_s, float **d_byl_s, float **d_byh_s, float *** uoz, float *** uox, float *** uoy, float *h_uz, float *h_ux, float *h_uy, float ***uc, float *h_dd, float *h_dd_combined, float **d_dd, sf_axis az, sf_axis ax, sf_axis ay, const int *nylocal, float spo, float idx, float idy, float idz, int nt, int jsnap, int jdata, int ngpu, int nyinterior, int ns, int nr, int nbell, int nc, bool interp, bool snap, bool fsrf, bool ssou, bool dabc, bool verb)
+static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullfdm, float **d_umx, float **d_uox, float **d_upx, float **d_uax, float **d_utx, float **d_umy, float **d_uoy, float **d_upy, float **d_uay, float **d_uty, float **d_umz, float **d_uoz, float **d_upz, float **d_uaz, float **d_utz, float **d_tzz, float **d_txx, float **d_tyy, float **d_txy, float **d_tyz, float **d_tzx, float **d_c11, float **d_c22, float **d_c33, float **d_c44, float **d_c55, float **d_c66, float **d_c12, float **d_c13, float **d_c23, float **d_Sw000, float **d_Sw001, float **d_Sw010, float **d_Sw011, float **d_Sw100, float **d_Sw101, float **d_Sw110, float **d_Sw111, int **d_Sjz, int **d_Sjx, int **d_Sjy, float **d_Rw000, float **d_Rw001, float **d_Rw010, float **d_Rw011, float **d_Rw100, float **d_Rw101, float **d_Rw110, float **d_Rw111, int **d_Rjz, int **d_Rjx, int **d_Rjy, float **d_bell, float **d_ww, float **d_ro, float **d_bzl_s, float **d_bzh_s, float **d_bxl_s, float **d_bxh_s, float **d_byl_s, float **d_byh_s, float *** uoz, float *** uox, float *** uoy, float *h_uz, float *h_ux, float *h_uy, float ***uc, float *h_dd, float *h_dd_combined, float **d_dd, sf_axis az, sf_axis ax, sf_axis ay, const int *nylocal, float spo, float idx, float idy, float idz, int nt, int jsnap, int jdata, int ngpu, int nyinterior, int ns, int nr, int nbell, int nc, bool interp, bool snap, bool fsrf, bool ssou, bool dabc, bool verb, int &total_iter)
 {
   int nb = fdm->nb;
   int nx = fdm->nx;
 
   if(verb) fprintf(stderr,"\n");
-  for (int it=0; it<nt; it++) {
+  for (int it=0; it<nt; it++, total_iter++) {
     if(verb) fprintf(stderr,"\b\b\b\b\b%d",it);
 
     /*------------------------------------------------------------*/
@@ -1026,7 +1027,7 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
     /* cut wavefield and save                     */
     /*    - Step #9                       */
     /*------------------------------------------------------------*/
-    if(snap && it%jsnap==0) {
+    if(snap && total_iter%jsnap==0) {
 
       gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, uox, uoy, uoz, nyinterior, ngpu);
 
@@ -1129,14 +1130,31 @@ static void set_nylocal(const fdm3d &fdm, int *nylocal, int ngpu, int nyinterior
   }
 }
 
-static void make_axis(modeling_t *m, sf_axis &az, sf_axis &ax, sf_axis &ay)
+static void make_axis(const fdm3d &fullfdm, modeling_t *m, int ngpu, sf_axis &az, sf_axis &ax, sf_axis &ay)
 {
-  az = sf_maxa(m->n1 - 2 * m->nb, m->o1 + m->nb * m->d1, m->d1);
-  ax = sf_maxa(m->n2 - 2 * m->nb, m->o2 + m->nb * m->d2, m->d2);
-  ay = sf_maxa(m->n3 - 2 * m->nb, m->o3 + m->nb * m->d3, m->d3);
+  /// make (nz+2nb-8) a multiple of 24
+  int n1 = SF_MIN(24 * ceilf((m->n1 - 8) / 24.0) + 8 - 2 * m->nb, fullfdm->nz);
+  int n2 = SF_MIN(24 * ceilf((m->n2 - 8) / 24.0) + 8 - 2 * m->nb, fullfdm->nx);
+
+  /// n3 a multiple of ngpu
+  int n3 = SF_MIN(ngpu * ceilf((m->n3 - 2 * m->nb) * 1.0 / ngpu), fullfdm->ny);
+  //az = sf_maxa(m->n1 - 2 * m->nb, m->o1 + m->nb * m->d1, m->d1);
+  //ax = sf_maxa(m->n2 - 2 * m->nb, m->o2 + m->nb * m->d2, m->d2);
+  //ay = sf_maxa(m->n3 - 2 * m->nb, m->o3 + m->nb * m->d3, m->d3);
+
+  az = sf_maxa(n1, m->o1 + m->nb * m->d1, m->d1);
+  ax = sf_maxa(n2, m->o2 + m->nb * m->d2, m->d2);
+  ay = sf_maxa(n3, m->o3 + m->nb * m->d3, m->d3);
 }
 
-static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullfdm, pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, float **d_ww, int ns, int nr, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb)
+
+/**
+ * After calling this function, the following variables got updated:
+ * h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz
+ *
+ * It also output the wavefield and data
+ */
+static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullfdm, pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, float **d_ww, int ns, int nr, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb, int &total_iter)
 {
 
   /*------------------------------------------------------------*/
@@ -1198,7 +1216,7 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
    *  MAIN LOOP
    */
   /*------------------------------------------------------------*/
-  main_loop(Fwfl, Fdat, fdm, fullfdm, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, d_bell, d_ww, d_ro, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s,  uz,  ux,  uy, h_uz, h_ux, h_uy, uc, h_dd, h_dd_combined, d_dd, az, ax, ay, nylocal, spo, idx, idy, idz, nt, jsnap, jdata, ngpu, nyinterior, ns, nr, nbell, nc, interp, snap, fsrf, ssou, dabc, verb);
+  main_loop(Fwfl, Fdat, fdm, fullfdm, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, d_bell, d_ww, d_ro, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s,  uz,  ux,  uy, h_uz, h_ux, h_uy, uc, h_dd, h_dd_combined, d_dd, az, ax, ay, nylocal, spo, idx, idy, idz, nt, jsnap, jdata, ngpu, nyinterior, ns, nr, nbell, nc, interp, snap, fsrf, ssou, dabc, verb, total_iter);
 
   gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_umx, d_umy, d_umz, h_umx, h_umy, h_umz, nyinterior, ngpu);
   gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, h_uox, h_uoy, h_uoz, nyinterior, ngpu);
@@ -1436,7 +1454,7 @@ int main(int argc, char* argv[]) {
 
   sf_warning("vmin: %f, vmax: %f, dmin: %f, dmax: %f", vmin, vmax, dmin, dmax);
   times_t *times = read_times();
-  init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact);
+  init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact, dt);
   box_t *domain = calc_shot_box(vv0, times, ss, rr, nr, nt, dt);
 
   init_sinc_table(8, 10000);
@@ -1452,25 +1470,49 @@ int main(int argc, char* argv[]) {
   float ***h_ro, ***h_c11, ***h_c22, ***h_c33, ***h_c44, ***h_c55, ***h_c66, ***h_c12, ***h_c13, ***h_c23;
   init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
 
-  for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
+  int total_iter = 0;
+  //for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
+  for (int iblock = 0; iblock < -1; iblock++) {
     sf_warning("FORWARD BLOCK: %d", iblock);
 
     sf_axis curaz = sf_maxa(1,1,1); // dummy, update later
     sf_axis curax = sf_maxa(1,1,1); // dummy, update later
     sf_axis curay = sf_maxa(1,1,1); // dummy, update later
     modeling_t *cur = &domain->hyper[iblock];
+    int curnt = cur->ntblock; sf_warning("curnt: %d", curnt);
+    float curdt = dt;
+    sf_warning("dt: %f, cur->dt: %f", curdt, cur->dt);
+    assert(fabs(curdt - cur->dt) < 0.0001);
 
-    make_axis(cur, curaz, curax, curay);
+    //continue;
+    make_axis(fullfdm, cur, ngpu, curaz, curax, curay);
+
+    fdm3d fdm=fdutil3d_init(verb,fsrf,curaz, curax, curay, nb,1);
+
+    interp_host_den_vel(oldfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+
+    interp_host_umo(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
+
+    run(Fwfl, Fdat, fdm, fullfdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, d_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
+
+    oldfdm = clonefdm(fdm);
+
+    break;
+  }
+
+  if (true) {
+    fdm3d fdm=fdutil3d_init(verb,fsrf,az, ax, ay, nb,1);
+
+    interp_host_den_vel(oldfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+
+    interp_host_umo(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
+
+    run(Fwfl, Fdat, fdm, fullfdm, ss, rr, az, ax, ay, 204, dt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, d_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
+
   }
 
   // TODO: put your code here, update az, ax, zy, nt, dt, then everything is supposed to be fine
   // TODO: you also need to interpolate full_*
-  fdm3d fdm=fdutil3d_init(verb,fsrf,az,ax,ay,nb,1);
-
-  interp_host_den_vel(oldfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
-  interp_host_umo(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
-
-  run(Fwfl, Fdat, fdm, fullfdm, ss, rr, az, ax, ay, nt, dt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, d_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb);
 
   /*------------------------------------------------------------*/
   /* deallocate host arrays */

@@ -13,6 +13,7 @@ static float gs_error;
 static float gs_errorfact;
 static float gs_qfact;
 static float gs_downfact;
+static float gs_dt; /// read from wavelet file
 
 static float calgoodsampling(float dt) {
   return 0.95 * dt;
@@ -116,10 +117,11 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
 
   float dtmax = 0.49 * dsamp / vmax;
   mod->dt = calgoodsampling(dtmax);
-  mod->dt = 0.004; // TODO: update dt
+  mod->dt = gs_dt; // TODO: update dt
   mod->ntblock = (timemax - timemin) / mod->dt;
   mod->dtextra = (timemax - timemin) - mod->dt * mod->ntblock;
 
+  sf_warning("mod->dt: %f", mod->dt);
   sf_warning("mod->n(:): %d, %d, %d", mod->n1, mod->n2, mod->n3);
   sf_warning("mod->o(:): %f, %f, %f", mod->o1, mod->o2, mod->o3);
   sf_warning("mod->d(:): %f, %f, %f", mod->d1, mod->d2, mod->d3);
@@ -171,7 +173,7 @@ times_t *read_times() {
   return t;
 }
 
-void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, float maxf, int   nb, float   error, float errorfact, float qfact, float downfact)
+void init_box(int timeblocks, float vmin, float vmax, float dmin, float dmax, float maxf, int nb, float error, float errorfact, float qfact, float downfact, float dt)
 {
   gs_timeblocks = timeblocks;
   gs_vmin       = vmin;
@@ -184,10 +186,12 @@ void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, 
   gs_errorfact  = errorfact;
   gs_qfact      = qfact;
   gs_downfact   = downfact;
+  gs_dt         = dt;
 
   float dstable   = 0.499 * dmin / vmax;
   gs_dtbig      = calgoodsampling(dstable);
 
+  sf_warning("dt: %f", gs_dt);
   sf_warning("dmin: %f, vmax: %f", dmin, vmax);
   sf_warning("dstable: %f", dstable);
   sf_warning("gs_dtbig: %f", gs_dtbig);

@@ -27,5 +27,5 @@ times_t *read_times();
 
 box_t *calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, const pt3d *rec3d, int nr, int nt, float dt);
 
-void init_box(int   timeblocks, float vmin, float vmax, float dmin, float dmax, float maxf, int   nb, float error, float errorfact, float qfact, float downfact);
+void init_box(int timeblocks, float vmin, float vmax, float dmin, float dmax, float maxf, int nb, float error, float errorfact, float qfact, float downfact, float dt);
 #endif /* end of include guard: BOX_H_MLWKBDTF */
