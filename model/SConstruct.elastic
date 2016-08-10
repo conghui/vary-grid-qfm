@@ -5,12 +5,12 @@ import fdmod,encode,wemig,stiffness,os
 # . . Set parameter for the modelling.  Applies for all situations.
 par = {
     # Space parameters
-    'nz':112,  'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
-    'nx':160,  'ox':0, 'dx':10,  'lx':'x', 'ux':'m',
+    'nz':400,  'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
+    'nx':400,  'ox':0, 'dx':10,  'lx':'x', 'ux':'m',
     'ny':64,   'oy':0, 'dy':10,  'ly':'y', 'uy':'m',
 
     # source location (only support one shot)
-    'sz': 0, 'sx':800, 'sy':320,
+    'sz': 0, 'sx':2000, 'sy':320,
 
     # receiver locations
     'rnz':1,   'roz':0, 'rdz':10,
@@ -18,7 +18,7 @@ par = {
     'rny':2,   'roy':0, 'rdy':10,
 
     # Time Parameters
-    'nt':408,'ot':0, 'dt':0.002,  'lt':'t', 'ut':'s',
+    'nt':308,'ot':0, 'dt':0.002,  'lt':'t', 'ut':'s',
     'kt':100,'frq':10,
 
     # Modelling parameters
@@ -27,6 +27,8 @@ par = {
 
     # Output
     'height':5,
+
+    'ngpu':2, 'timeblocks':1
     }
 
 # . . Initialize parameters in fdm module
@@ -169,8 +171,8 @@ for m in ['VTI']:
         wfl=${TARGETS[1]}
         vp=${SOURCES[5]}
         times=${SOURCES[6]}
-        ngpu=2 jdata=%(jdata)d verb=%(verb)s free=n ssou=%(ssou)s
-        opot=n snap=%(snap)s jsnap=%(jsnap)d timeblocks=2
+        ngpu=%(ngpu)d jdata=%(jdata)d verb=%(verb)s free=n ssou=%(ssou)s
+        opot=n snap=%(snap)s jsnap=%(jsnap)d timeblocks=%(timeblocks)d
         dabc=%(dabc)s nb=%(nb)d nbell=%(nbell)d
         ''' %par)
 
@@ -185,6 +187,6 @@ for m in ['VTI']:
     for i in range(1):
         tag = "%d-xz"%i
         Plot(m+'w-3d-GPU'+tag,m+'w-3d-GPU',
-       'window f5=1 n5=1 n4=1 f4=%d f3=%d n3=1 min1=0 min2=0 min3=0 n1=%d n2=%d | grey color=j gainpanel=e scalebar=y'%(i, par['ny']/2, par['nz'],par['nx']),view=1)
+       'window f5=0 n5=1 n4=1 f4=%d f3=%d n3=1 min1=0 min2=0 min3=0 n1=%d n2=%d | grey color=j gainpanel=e scalebar=y'%(i, par['ny']/2, par['nz'],par['nx']),view=1)
 
 End()

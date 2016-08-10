@@ -172,8 +172,9 @@ void init_sinc_table(int nsinc, int npts)
   /*sf_floatwrite(gs_sinc_table[0], nsinc * npts, ftable);*/
 }
 
-
-void interpfield_(float ***oldf, float ***newf, bool extend,
+static void init_interp_coeff(int *t1, int *t2, int *t3, int **c1, int **c2, int **c3,
+    int *b1, int *b2, int *b3,
+    int *e1, int *e2, int *e3,
     int on1, float oo1, float od1,  /* old */
     int on2, float oo2, float od2,
     int on3, float oo3, float od3,
@@ -184,35 +185,15 @@ void interpfield_(float ***oldf, float ***newf, bool extend,
   float *x1 = sf_floatalloc(nn1);
   float *x2 = sf_floatalloc(nn2);
   float *x3 = sf_floatalloc(nn3);
-  int b1 = nn1;
-  int b2 = nn2;
-  int b3 = nn3;
-  int e1 = 0;
-  int e2 = 0;
-  int e3 = 0;
   int ns = gs_ns;
 
-  memset(newf[0][0], 0, sizeof(float)*nn1*nn2*nn3);
-
-  x_b_e(on1, oo1, od1, nn1, no1, nd1, x1, &b1, &e1);
-  x_b_e(on2, oo2, od2, nn2, no2, nd2, x2, &b2, &e2);
-  x_b_e(on3, oo3, od3, nn3, no3, nd3, x3, &b3, &e3);
-
-  /*sf_warning("b1,b2,b3: %d, %d, %d", b1, b2, b3);*/
-  /*sf_warning("e1,e2,e3: %d, %d, %d", e1, e2, e3);*/
-  /*for (int i = 0; i < nn3; i++) {*/
-    /*sf_warning("%f", x3[i]);*/
-  /*}*/
+  x_b_e(on1, oo1, od1, nn1, no1, nd1, x1, b1, e1);
+  x_b_e(on2, oo2, od2, nn2, no2, nd2, x2, b2, e2);
+  x_b_e(on3, oo3, od3, nn3, no3, nd3, x3, b3, e3);
 
   int *k1  = sf_intalloc(nn1); assert(k1);
   int *k2  = sf_intalloc(nn2);
   int *k3  = sf_intalloc(nn3);
-  int *t1    = sf_intalloc(nn1);
-  int *t2    = sf_intalloc(nn2);
-  int *t3    = sf_intalloc(nn3);
-  int **c1 = sf_intalloc2(ns, nn1);
-  int **c2 = sf_intalloc2(ns, nn2);
-  int **c3 = sf_intalloc2(ns, nn3);
 
   calc_t(x1, k1, t1, nn1, gs_npts);
   calc_t(x2, k2, t2, nn2, gs_npts);
@@ -242,19 +223,38 @@ void interpfield_(float ***oldf, float ***newf, bool extend,
   updown_cip(c2, ns, nn2, 0, on2-1);
   updown_cip(c3, ns, nn3, 0, on3-1);
 
-  /*for (int i = 0; i < ns; i++) {*/
-    /*sf_warning("c1[0][%d]: %d", i, c1[0][i]);*/
-  /*}*/
-  /*sf_warning("write c1, c2, c3");*/
-  /*write2di("c1.rsf", c1, ns, nn1);*/
-  /*write2di("c2.rsf", c2, ns, nn2);*/
-  /*write2di("c3.rsf", c3, ns, nn3);*/
+  free(x1); free(x2); free(x3);
+  free(k1); free(k2); free(k3);
+}
 
-  /*write1di("t1.rsf", t1, nn1);*/
-  /*exit(0);*/
+void interpfield_(float ***oldf, float ***newf, bool extend,
+    int on1, float oo1, float od1,  /* old */
+    int on2, float oo2, float od2,
+    int on3, float oo3, float od3,
+    int nn1, float no1, float nd1,  /* new */
+    int nn2, float no2, float nd2,
+    int nn3, float no3, float nd3)
+{
+
+  int b1 = nn1;
+  int b2 = nn2;
+  int b3 = nn3;
+  int e1 = 0;
+  int e2 = 0;
+  int e3 = 0;
+  int ns = gs_ns;
+  int *t1    = sf_intalloc(nn1);
+  int *t2    = sf_intalloc(nn2);
+  int *t3    = sf_intalloc(nn3);
+  int **c1 = sf_intalloc2(ns, nn1);
+  int **c2 = sf_intalloc2(ns, nn2);
+  int **c3 = sf_intalloc2(ns, nn3);
+
+  init_interp_coeff(t1, t2, t3, c1, c2, c3, &b1, &b2, &b3, &e1, &e2, &e3, on1, oo1, od1, on2, oo2, od2, on3, oo3, od3, nn1, no1, nd1, nn2, no2, nd2, nn3, no3, nd3);
+
+  memset(newf[0][0], 0, sizeof(float)*nn1*nn2*nn3);
 
   if (extend) {
-    /*sf_warning("computation of interpolation with extend = true");*/
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -299,10 +299,83 @@ void interpfield_(float ***oldf, float ***newf, bool extend,
     }
 
   }
-  free(x1); free(x2); free(x3);
-  free(k1); free(k2); free(k3);
   free(t1); free(t2); free(t3);
   free(*c1); free(*c2); free(*c3);
   free(c1); free(c2); free(c3);
 }
 
+void interp_den_vel_(float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***h_ro, float ***h_c11, float ***h_c22, float ***h_c33, float ***h_c44, float ***h_c55, float ***h_c66, float ***h_c12, float ***h_c13, float ***h_c23,
+    int on1, float oo1, float od1,  /* old */
+    int on2, float oo2, float od2,
+    int on3, float oo3, float od3,
+    int nn1, float no1, float nd1,  /* new */
+    int nn2, float no2, float nd2,
+    int nn3, float no3, float nd3)
+{
+  int b1 = nn1;
+  int b2 = nn2;
+  int b3 = nn3;
+  int e1 = 0;
+  int e2 = 0;
+  int e3 = 0;
+  int ns = gs_ns;
+  int *t1    = sf_intalloc(nn1);
+  int *t2    = sf_intalloc(nn2);
+  int *t3    = sf_intalloc(nn3);
+  int **c1 = sf_intalloc2(ns, nn1);
+  int **c2 = sf_intalloc2(ns, nn2);
+  int **c3 = sf_intalloc2(ns, nn3);
+
+
+  init_interp_coeff(t1, t2, t3, c1, c2, c3, &b1, &b2, &b3, &e1, &e2, &e3, on1, oo1, od1, on2, oo2, od2, on3, oo3, od3, nn1, no1, nd1, nn2, no2, nd2, nn3, no3, nd3);
+
+  memset(h_ro[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(h_c11[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(h_c22[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(h_c33[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(h_c44[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(h_c55[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(h_c66[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(h_c12[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(h_c13[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(h_c23[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+
+#ifdef _OPENMP
+/*#pragma omp parallel for schedule(guided)*/
+#pragma omp parallel for 
+#endif
+  for (int i3 = 0; i3 < nn3; i3++) {
+    for (int i2 = 0; i2 < nn2; i2++) {
+      for (int i1 = 0; i1 < nn1; i1++) {
+        for (int ic = 0; ic < ns; ic++) {
+          for (int ib = 0; ib < ns; ib++) {
+            for (int ia = 0; ia < ns; ia++) {
+              int oi1 = c1[i1][ia];
+              int oi2 = c2[i2][ib];
+              int oi3 = c3[i3][ic];
+              float coef = 
+                gs_sinc_table[t1[i1]][ia] *
+                gs_sinc_table[t2[i2]][ib] *
+                gs_sinc_table[t3[i3]][ic];
+
+              h_ro[i3][i2][i1] += full_h_ro[oi3][oi2][oi1] * coef;
+              h_c11[i3][i2][i1] += full_h_c11[oi3][oi2][oi1] * coef;
+              h_c22[i3][i2][i1] += full_h_c22[oi3][oi2][oi1] * coef;
+              h_c33[i3][i2][i1] += full_h_c33[oi3][oi2][oi1] * coef;
+              h_c44[i3][i2][i1] += full_h_c44[oi3][oi2][oi1] * coef;
+              h_c55[i3][i2][i1] += full_h_c55[oi3][oi2][oi1] * coef;
+              h_c66[i3][i2][i1] += full_h_c66[oi3][oi2][oi1] * coef;
+              h_c12[i3][i2][i1] += full_h_c12[oi3][oi2][oi1] * coef;
+              h_c13[i3][i2][i1] += full_h_c13[oi3][oi2][oi1] * coef;
+              h_c23[i3][i2][i1] += full_h_c23[oi3][oi2][oi1] * coef;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  free(t1); free(t2); free(t3);
+  free(*c1); free(*c2); free(*c3);
+  free(c1); free(c2); free(c3);
+}

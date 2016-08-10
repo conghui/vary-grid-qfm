@@ -18,6 +18,7 @@ extern "C" {
 #include "check.h"
 }
 
+#include <sys/time.h>
 #include <assert.h>
 #include "ewefd3d_kernels.h"
 
@@ -61,7 +62,7 @@ static void scatter_to_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h_
 
 static void gather_from_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h_uz, float **d_uox, float **d_uoy, float **d_uoz, float ***uox, float ***uoy, float ***uoz, int nyinterior, int ngpu)
 {
-  sf_warning("%s: cudaMemcpy", __PRETTY_FUNCTION__);
+  sf_warning("%s: cudaMemcpy", __FUNCTION__);
   cudaMemcpy(h_ux, d_uox[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
   cudaMemcpy(h_uy, d_uoy[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
   cudaMemcpy(h_uz, d_uoz[0], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
@@ -168,7 +169,7 @@ static void interp_den_vel(const fdm3d &oldfdm, const fdm3d &newfdm, float ***ol
     return;
   }
   float ***nu = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
-  interpfield_(oldf, nu, false,
+  interpfield_(oldf, nu, true,
     oldfdm->nzpad, oldfdm->oz, oldfdm->dz,  /* old */
     oldfdm->nxpad, oldfdm->ox, oldfdm->dx,
     oldfdm->nypad, oldfdm->oy, oldfdm->dy,
@@ -178,6 +179,46 @@ static void interp_den_vel(const fdm3d &oldfdm, const fdm3d &newfdm, float ***ol
 
   free(**newf); free(*newf); free(newf);
   newf = nu;
+}
+
+static void interp_host_den_vel_patch(const fdm3d &oldfdm, const fdm3d &newfdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
+{
+  if (checksame(oldfdm, newfdm)) {
+    sf_warning("old and new dimensions for den/vel are the same, don't need interpolatin");
+    return;
+  }
+
+  struct timeval start, stop;
+  gettimeofday(&start, NULL);
+
+  free(**h_ro); free(*h_ro); free(h_ro); h_ro = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c11); free(*h_c11); free(h_c11); h_c11 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c22); free(*h_c22); free(h_c22); h_c22 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c33); free(*h_c33); free(h_c33); h_c33 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c44); free(*h_c44); free(h_c44); h_c44 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c55); free(*h_c55); free(h_c55); h_c55 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c66); free(*h_c66); free(h_c66); h_c66 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c12); free(*h_c12); free(h_c12); h_c12 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c13); free(*h_c13); free(h_c13); h_c13 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c23); free(*h_c23); free(h_c23); h_c23 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+
+
+  interp_den_vel_(
+      full_h_ro, full_h_c11, full_h_c22, full_h_c33,
+      full_h_c44, full_h_c55, full_h_c66, full_h_c12,
+      full_h_c13, full_h_c23,
+      h_ro, h_c11, h_c22, h_c33, h_c44,
+      h_c55, h_c66, h_c12, h_c13, h_c23,
+    oldfdm->nzpad, oldfdm->oz, oldfdm->dz,  /* old */
+    oldfdm->nxpad, oldfdm->ox, oldfdm->dx,
+    oldfdm->nypad, oldfdm->oy, oldfdm->dy,
+    newfdm->nzpad, newfdm->oz, newfdm->dz,  /* new */
+    newfdm->nxpad, newfdm->ox, newfdm->dx,
+    newfdm->nypad, newfdm->oy, newfdm->dy);
+
+  gettimeofday(&stop, NULL);
+  float elapse = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec) * 1e-6;
+  fprintf(stderr, "time for interpolate density and velocities: %.2f\n", elapse);
 }
 
 static void interp_host_umo(const fdm3d &oldfdm, const fdm3d &newfdm, float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
@@ -192,6 +233,9 @@ static void interp_host_umo(const fdm3d &oldfdm, const fdm3d &newfdm, float ***&
 
 static void interp_host_den_vel(const fdm3d &oldfdm, const fdm3d &newfdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
 {
+  struct timeval start, stop;
+  gettimeofday(&start, NULL);
+
   interp_den_vel(oldfdm, newfdm, full_h_ro, h_ro);
   interp_den_vel(oldfdm, newfdm, full_h_c11, h_c11);
   interp_den_vel(oldfdm, newfdm, full_h_c22, h_c22);
@@ -202,6 +246,10 @@ static void interp_host_den_vel(const fdm3d &oldfdm, const fdm3d &newfdm, float 
   interp_den_vel(oldfdm, newfdm, full_h_c12, h_c12);
   interp_den_vel(oldfdm, newfdm, full_h_c13, h_c13);
   interp_den_vel(oldfdm, newfdm, full_h_c23, h_c23);
+
+  gettimeofday(&stop, NULL);
+  float elapse = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec) * 1e-6;
+  fprintf(stderr, "time for interpolate density and velocities: %.2f\n", elapse);
 }
 static fdm3d clonefdm(const fdm3d &fdm)
 {
@@ -1241,9 +1289,8 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
 
   /*------------------------------------------------------------*/
   /* deallocate GPU arrays */
-
+  /*
   for (int g = 0; g < ngpu; g++){
-    break;
     cudaFree(&d_ww[g]);
     cudaFree(&d_dd[g]);
     cudaFree(&d_bell[g]);
@@ -1302,6 +1349,7 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
       cudaFree(&d_Rw111[g]);
     }
   }
+  */
 }
 
 // entry point
@@ -1495,7 +1543,9 @@ int main(int argc, char* argv[]) {
     fdm3d fdm=fdutil3d_init(verb,fsrf,curaz, curax, curay, nb,1);
 
     sf_warning("iterpolating density and velocity");
-    interp_host_den_vel(fullfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+    interp_host_den_vel_patch(fullfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+
+    interp_host_umo(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
 
     run(Fwfl, Fdat, fdm, fullfdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, h_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
 

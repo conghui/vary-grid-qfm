@@ -8,10 +8,10 @@ additional_includes = [os.environ['RSFROOT'] + '/include']
 additional_libpath  = [os.environ['RSFROOT'] + '/lib']
 additional_libs     = ['rsf', 'su']
 
-c_compiler    = ['/usr/bin/gcc', '-fopenmp', '-std=c99']
+c_compiler    = ['/usr/bin/gcc',  '-std=c99']
 cxx_compiler  = ['g++', '-fopenmp']
-cur_cflags    = ['-Wall', '-Wextra', '-g', '-O2', '-DNO_BLAS',]
-cuda_cc       = ['nvcc', '--compiler-bindir', '/usr/bin/gcc', '-arch=sm_35', '-G', '-g', '-O0']
+cur_cflags    = ['-Wall', '-Wextra', '-fopenmp', '-g', '-O2', '-DNO_BLAS',]
+cuda_cc       = ['nvcc', '--compiler-bindir', '/usr/bin/gcc', '-arch=sm_35', '-O2']
 
 # set the sub directories (key, value), where value is the name of directory#{{{
 # please make sure the source code are in src subdirectory
