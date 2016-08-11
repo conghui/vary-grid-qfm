@@ -341,8 +341,8 @@ void interp_den_vel_(float ***full_h_ro, float ***full_h_c11, float ***full_h_c2
   memset(h_c23[0][0], 0, sizeof(float)*nn1*nn2*nn3);
 
 #ifdef _OPENMP
-/*#pragma omp parallel for schedule(guided)*/
-#pragma omp parallel for 
+#pragma omp parallel for schedule(guided)
+/*#pragma omp parallel for */
 #endif
   for (int i3 = 0; i3 < nn3; i3++) {
     for (int i2 = 0; i2 < nn2; i2++) {
@@ -368,6 +368,76 @@ void interp_den_vel_(float ***full_h_ro, float ***full_h_c11, float ***full_h_c2
               h_c12[i3][i2][i1] += full_h_c12[oi3][oi2][oi1] * coef;
               h_c13[i3][i2][i1] += full_h_c13[oi3][oi2][oi1] * coef;
               h_c23[i3][i2][i1] += full_h_c23[oi3][oi2][oi1] * coef;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  free(t1); free(t2); free(t3);
+  free(*c1); free(*c2); free(*c3);
+  free(c1); free(c2); free(c3);
+}
+
+void interp_wavefield_(
+    float ***o_umx, float ***o_uox,  float ***o_umy,  float ***o_uoy,  float ***o_umz,  float ***o_uoz,
+    float ***n_umx, float ***n_uox,  float ***n_umy,  float ***n_uoy,  float ***n_umz,  float ***n_uoz,
+    int on1, float oo1, float od1,  /* old */
+    int on2, float oo2, float od2,
+    int on3, float oo3, float od3,
+    int nn1, float no1, float nd1,  /* new */
+    int nn2, float no2, float nd2,
+    int nn3, float no3, float nd3)
+{
+  int b1 = nn1;
+  int b2 = nn2;
+  int b3 = nn3;
+  int e1 = 0;
+  int e2 = 0;
+  int e3 = 0;
+  int ns = gs_ns;
+  int *t1    = sf_intalloc(nn1);
+  int *t2    = sf_intalloc(nn2);
+  int *t3    = sf_intalloc(nn3);
+  int **c1 = sf_intalloc2(ns, nn1);
+  int **c2 = sf_intalloc2(ns, nn2);
+  int **c3 = sf_intalloc2(ns, nn3);
+
+
+  init_interp_coeff(t1, t2, t3, c1, c2, c3, &b1, &b2, &b3, &e1, &e2, &e3, on1, oo1, od1, on2, oo2, od2, on3, oo3, od3, nn1, no1, nd1, nn2, no2, nd2, nn3, no3, nd3);
+
+  memset(n_umx[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(n_umy[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(n_umz[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(n_uox[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(n_uoy[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+  memset(n_uoz[0][0], 0, sizeof(float)*nn1*nn2*nn3);
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(guided)
+/*#pragma omp parallel for */
+#endif
+  for (int i3 = b3; i3 <= e3; i3++) {
+    for (int i2 = b2; i2 <= e2; i2++) {
+      for (int i1 = b1; i1 <= e1; i1++) {
+        for (int ic = 0; ic < ns; ic++) {
+          for (int ib = 0; ib < ns; ib++) {
+            for (int ia = 0; ia < ns; ia++) {
+              int oi1 = c1[i1][ia];
+              int oi2 = c2[i2][ib];
+              int oi3 = c3[i3][ic];
+              float coef = 
+                gs_sinc_table[t1[i1]][ia] *
+                gs_sinc_table[t2[i2]][ib] *
+                gs_sinc_table[t3[i3]][ic];
+
+              n_umx[i3][i2][i1] += o_umx[oi3][oi2][oi1] * coef;
+              n_umy[i3][i2][i1] += o_umy[oi3][oi2][oi1] * coef;
+              n_umz[i3][i2][i1] += o_umz[oi3][oi2][oi1] * coef;
+              n_uox[i3][i2][i1] += o_uox[oi3][oi2][oi1] * coef;
+              n_uoy[i3][i2][i1] += o_uoy[oi3][oi2][oi1] * coef;
+              n_uoz[i3][i2][i1] += o_uoz[oi3][oi2][oi1] * coef;
             }
           }
         }

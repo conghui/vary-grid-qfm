@@ -25,4 +25,14 @@ void interp_den_vel_(
     int nn2, float no2, float nd2,
     int nn3, float no3, float nd3);
 
+void interp_wavefield_(
+    float ***o_umx, float ***o_uox,  float ***o_umy,  float ***o_uoy,  float ***o_umz,  float ***o_uoz,
+    float ***n_umx, float ***n_uox,  float ***n_umy,  float ***n_uoy,  float ***n_umz,  float ***n_uoz,
+    int on1, float oo1, float od1,  /* old */
+    int on2, float oo2, float od2,
+    int on3, float oo3, float od3,
+    int nn1, float no1, float nd1,  /* new */
+    int nn2, float no2, float nd2,
+    int nn3, float no3, float nd3);
+
 #endif /* end of include guard: RESAMPLE_H_WQCWR39E */

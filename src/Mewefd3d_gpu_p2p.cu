@@ -221,6 +221,40 @@ static void interp_host_den_vel_patch(const fdm3d &oldfdm, const fdm3d &newfdm, 
   fprintf(stderr, "time for interpolate density and velocities: %.2f\n", elapse);
 }
 
+static void interp_host_umo_patch(const fdm3d &oldfdm, const fdm3d &newfdm, float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
+{
+  struct timeval start, stop;
+  gettimeofday(&start, NULL);
+
+  float ***n_umx = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_umy = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_umz = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_uox = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_uoy = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_uoz = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+
+  interp_wavefield_(
+    h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz,
+    n_umx, n_uox,  n_umy,  n_uoy,  n_umz,  n_uoz,
+    oldfdm->nzpad, oldfdm->oz, oldfdm->dz,  /* old */
+    oldfdm->nxpad, oldfdm->ox, oldfdm->dx,
+    oldfdm->nypad, oldfdm->oy, oldfdm->dy,
+    newfdm->nzpad, newfdm->oz, newfdm->dz,  /* new */
+    newfdm->nxpad, newfdm->ox, newfdm->dx,
+    newfdm->nypad, newfdm->oy, newfdm->dy);
+
+  free(**h_umx); free(*h_umx); free(h_umx); h_umx = n_umx;
+  free(**h_umy); free(*h_umy); free(h_umy); h_umy = n_umy;
+  free(**h_umz); free(*h_umz); free(h_umz); h_umz = n_umz;
+  free(**h_uox); free(*h_uox); free(h_uox); h_uox = n_uox;
+  free(**h_uoy); free(*h_uoy); free(h_uoy); h_uoy = n_uoy;
+  free(**h_uoz); free(*h_uoz); free(h_uoz); h_uoz = n_uoz;
+
+  gettimeofday(&stop, NULL);
+  float elapse = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec) * 1e-6;
+  fprintf(stderr, "time for interpolate wavefields: %.2f\n", elapse);
+}
+
 static void interp_host_umo(const fdm3d &oldfdm, const fdm3d &newfdm, float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
 {
   interp_wavefield(oldfdm, newfdm, h_umx);
@@ -1545,7 +1579,8 @@ int main(int argc, char* argv[]) {
     sf_warning("iterpolating density and velocity");
     interp_host_den_vel_patch(oldfdm, fdm, fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
 
-    interp_host_umo(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
+    sf_warning("iterpolating wavefields");
+    interp_host_umo_patch(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
 
     run(Fwfl, Fdat, fdm, fullfdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, h_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
 
