@@ -78,8 +78,8 @@ def generate(env):
   add_common_nvcc_variables(env)
 
   # set the "CUDA Compiler Command" environment variable
-  env['NVCC'] = 'nvcc --compiler-bindir /usr/bin/gcc -O2'
-  env['SHNVCC'] = 'nvcc --compiler-bindir /usr/bin/gcc -O2'
+  env['NVCC'] = 'nvcc --compiler-bindir /usr/bin/gcc -O0 -g -G'
+  env['SHNVCC'] = 'nvcc --compiler-bindir /usr/bin/gcc -O0 -g -G'
 
   # set the include path, and pass both c compiler flags and c++ compiler flags
   env['NVCCFLAGS'] = SCons.Util.CLVar('')

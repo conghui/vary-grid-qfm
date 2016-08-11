@@ -815,7 +815,7 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
   int nx = fdm->nx;
 
   if(verb) fprintf(stderr,"\n");
-  for (int it=1; it<=nt; it++, total_iter++) {
+  for (int it=0; it<nt; it++, total_iter++) {
     if(verb) fprintf(stderr,"\b\b\b\b\b%d", total_iter);
 
     /*------------------------------------------------------------*/
@@ -1051,17 +1051,17 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
       cudaSetDevice(0);
       dim3 dimGrid_spng_XZ(ceil(fdm->nxpad/192.0f),1,fdm->nzpad);
       dim3 dimBlock_spng_XZ(192,1,1);
-      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_umz[0], fdm->nxpad, fdm->nzpad, nb);
-      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_uoz[0], fdm->nxpad, fdm->nzpad, nb);
-      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_upz[0], fdm->nxpad, fdm->nzpad, nb);
+      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_umz[0], fdm->nxpad, fdm->nzpad, nb, nylocal[0]);
+      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_uoz[0], fdm->nxpad, fdm->nzpad, nb, nylocal[0]);
+      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_upz[0], fdm->nxpad, fdm->nzpad, nb, nylocal[0]);
 
-      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_umx[0], fdm->nxpad, fdm->nzpad, nb);
-      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_uox[0], fdm->nxpad, fdm->nzpad, nb);
-      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_upx[0], fdm->nxpad, fdm->nzpad, nb);
+      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_umx[0], fdm->nxpad, fdm->nzpad, nb, nylocal[0]);
+      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_uox[0], fdm->nxpad, fdm->nzpad, nb, nylocal[0]);
+      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_upx[0], fdm->nxpad, fdm->nzpad, nb, nylocal[0]);
 
-      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_umy[0], fdm->nxpad, fdm->nzpad, nb);
-      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_uoy[0], fdm->nxpad, fdm->nzpad, nb);
-      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_upy[0], fdm->nxpad, fdm->nzpad, nb);
+      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_umy[0], fdm->nxpad, fdm->nzpad, nb, nylocal[0]);
+      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_uoy[0], fdm->nxpad, fdm->nzpad, nb, nylocal[0]);
+      sponge3d_apply_XZ_low<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_upy[0], fdm->nxpad, fdm->nzpad, nb, nylocal[0]);
 
       cudaSetDevice(ngpu-1);
       sponge3d_apply_XZ_high<<<dimGrid_spng_XZ,dimBlock_spng_XZ>>>(d_umz[ngpu-1], fdm->nxpad, nylocal[ngpu-1], fdm->nzpad, nb);
@@ -1270,6 +1270,9 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
   int *nylocal = (int*)malloc(ngpu*sizeof(int));  // size of sub-domains in y-dimension INCLUDING any ghost cells from adjacent GPUs
   set_nylocal(fdm, nylocal, ngpu, nyinterior);
   check_zx_dim(fdm, ngpu);
+  for (int i = 0; i < ngpu; i++) {
+    sf_warning("nylocal[%d]: %d", i, nylocal[i]);
+  }
   if(snap) { alloc_wlf(fdm, uz, ux, uy, h_uz, h_ux, h_uy, uc, nyinterior); }
   float **d_Sw000,  **d_Sw001,  **d_Sw010,  **d_Sw011,  **d_Sw100,  **d_Sw101,  **d_Sw110,  **d_Sw111;
   float **d_Rw000,  **d_Rw001,  **d_Rw010,  **d_Rw011,  **d_Rw100,  **d_Rw101,  **d_Rw110,  **d_Rw111;
@@ -1323,6 +1326,8 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
   /*------------------------------------------------------------*/
   /* deallocate GPU arrays */
   for (int g = 0; g < ngpu; g++){
+    cudaSetDevice(g);
+
     cudaFree(d_ww[g]);
     cudaFree(d_dd[g]);
     cudaFree(d_bell[g]);
@@ -1343,8 +1348,8 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
       cudaFree(d_bzh_s[g]);
       cudaFree(d_bxl_s[g]);
       cudaFree(d_bxh_s[g]);
-      cudaFree(d_byl_s[0]);
-      cudaFree(d_byh_s[ngpu-1]);
+      if (g == 0) cudaFree(d_byl_s[0]);
+      if (g == ngpu - 1) cudaFree(d_byh_s[ngpu-1]);
     }
 
     cudaFree(d_umx[g]); cudaFree(d_umy[g]); cudaFree(d_umz[g]);
@@ -1549,13 +1554,13 @@ int main(int argc, char* argv[]) {
   init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
 
   int total_iter = 1;
-    sf_warning("init cuda device ...");
-    for (int g = 0; g < ngpu; g++){
-      cudaSetDevice(g);
-      cudaDeviceReset();
-      cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-    }
-    sf_warning("init cuda device finished");
+  sf_warning("init cuda device ...");
+  for (int g = 0; g < ngpu; g++){
+    cudaSetDevice(g);
+    cudaDeviceReset();
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+  }
+  sf_warning("init cuda device finished");
   for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
     sf_warning("FORWARD BLOCK: %d", iblock);
 

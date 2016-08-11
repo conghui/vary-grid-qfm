@@ -28,7 +28,7 @@ par = {
     # Output
     'height':5,
 
-    'ngpu':1, 'timeblocks':2
+    'ngpu':4, 'timeblocks':4
     }
 
 # . . Initialize parameters in fdm module

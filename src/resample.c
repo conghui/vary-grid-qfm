@@ -353,7 +353,7 @@ void interp_den_vel_(float ***full_h_ro, float ***full_h_c11, float ***full_h_c2
               int oi1 = c1[i1][ia];
               int oi2 = c2[i2][ib];
               int oi3 = c3[i3][ic];
-              float coef = 
+              float coef =
                 gs_sinc_table[t1[i1]][ia] *
                 gs_sinc_table[t2[i2]][ib] *
                 gs_sinc_table[t3[i3]][ic];
@@ -427,7 +427,7 @@ void interp_wavefield_(
               int oi1 = c1[i1][ia];
               int oi2 = c2[i2][ib];
               int oi3 = c3[i3][ic];
-              float coef = 
+              float coef =
                 gs_sinc_table[t1[i1]][ia] *
                 gs_sinc_table[t2[i2]][ib] *
                 gs_sinc_table[t3[i3]][ic];

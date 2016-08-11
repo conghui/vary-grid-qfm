@@ -1231,14 +1231,14 @@ __global__ void sponge3d_apply_ZY(int gpuID, float *d_uu, int nxpad, int nyinter
 }
 
 // Apply the exponential-damping sponge BC in the boundary region in the low Y-indicies parallel to the XZ-plane
-__global__ void sponge3d_apply_XZ_low(float *d_uu, int nxpad, int nzpad, int nb){
+__global__ void sponge3d_apply_XZ_low(float *d_uu, int nxpad, int nzpad, int nb, int nylocal){
 
   int x = threadIdx.x + blockIdx.x * blockDim.x;
   int z = threadIdx.z + blockIdx.z * blockDim.z;
 
   if (x < nxpad && z < nzpad){
-
-    for (int y = 0; y < nb; y++){
+    int m = nb < nylocal ? nb : nylocal;
+    for (int y = 0; y < m; y++){
       // calculate the sponge coeff
       float spo = (nb - y - 1) / (sqrt(2.0) * 4.0f * nb);
       spo = exp(-spo * spo);
@@ -1257,8 +1257,8 @@ __global__ void sponge3d_apply_XZ_high(float *d_uu, int nxpad, int nylocal, int 
   int z = threadIdx.z + blockIdx.z * blockDim.z;
 
   if (x < nxpad && z < nzpad){
-
-    for (int y = 0; y < nb; y++){
+    int m = nb < nylocal ? nb : nylocal;
+    for (int y = 0; y < m; y++){
       // calculate the sponge coeff
       float spo = (nb - y - 1) / (sqrt(2.0) * 4.0f * nb);
       spo = exp(-spo * spo);

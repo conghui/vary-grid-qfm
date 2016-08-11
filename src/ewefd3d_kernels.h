@@ -32,7 +32,7 @@ __global__ void sponge3d_apply_XY(int gpuID, float *d_uu, int nxpad, int nyinter
 __global__ void sponge3d_apply_ZY(int gpuID, float *d_uu, int nxpad, int nyinterior, int nzpad, int nb, int nx, float spo);
 
 
-__global__ void sponge3d_apply_XZ_low(float *d_uu, int nxpad, int nzpad, int nb);
+__global__ void sponge3d_apply_XZ_low(float *d_uu, int nxpad, int nzpad, int nb, int nylocal);
 
 __global__ void sponge3d_apply_XZ_high(float *d_uu, int nxpad, int nylocal, int nzpad, int nb);
 
