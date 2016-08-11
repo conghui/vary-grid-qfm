@@ -218,6 +218,11 @@ __global__ void dispToStrain(int nxpad, int nylocal, int nzpad, float *d_uox, fl
   // progress through the 3d volume
   while (y < nylocal - 4){
 
+    // get the value y+4 away from the current position of the thread front
+    uox_p.w = d_uox[(nxNz * (y+4)) + offset];
+    uoy_p.w = d_uoy[(nxNz * (y+4)) + offset];
+    uoz_p.w = d_uoz[(nxNz * (y+4)) + offset];
+
     int globalAddr = (nxNz * y) + offset; // global address into d_ arrays
 
     if (threadIdx.x < 4){ // load left halo into shared memory
@@ -314,11 +319,6 @@ __global__ void dispToStrain(int nxpad, int nylocal, int nzpad, float *d_uox, fl
     uox_p.x = uox_p.y;    uoy_p.x = uoy_p.y;    uoz_p.x = uoz_p.y;
     uox_p.y = uox_p.z;    uoy_p.y = uoy_p.z;    uoz_p.y = uoz_p.z;
     uox_p.z = uox_p.w;    uoy_p.z = uoy_p.w;    uoz_p.z = uoz_p.w;
-
-    // get the value y+4 away from the current position of the thread front
-    uox_p.w = d_uox[(nxNz * (y+4)) + offset];
-    uoy_p.w = d_uoy[(nxNz * (y+4)) + offset];
-    uoz_p.w = d_uoz[(nxNz * (y+4)) + offset];
 
     __syncthreads();
 
@@ -647,6 +647,11 @@ __global__ void stressToAccel(int nxpad, int nzpad, int nylocal, float idx, floa
   // progress through the 3d volume
   while (y < nylocal - 4){
 
+    // get the value y+4 away from the current position of the thread front
+    txy_p.w = d_txy[(nxNz * (y+4)) + offset];
+    tyy_p.w = d_tyy[(nxNz * (y+4)) + offset];
+    tyz_p.w = d_tyz[(nxNz * (y+4)) + offset];
+
     int globalAddr = (nxNz * y) + offset; // global address in d_ arrays
 
     if (threadIdx.x < 4){   // load left halo into shared memory
@@ -745,11 +750,6 @@ __global__ void stressToAccel(int nxpad, int nzpad, int nylocal, float idx, floa
     txy_p.x = txy_p.y;    tyy_p.x = tyy_p.y;    tyz_p.x = tyz_p.y;
     txy_p.y = txy_p.z;    tyy_p.y = tyy_p.z;    tyz_p.y = tyz_p.z;
     txy_p.z = txy_p.w;    tyy_p.z = tyy_p.w;    tyz_p.z = tyz_p.w;
-
-    // get the value y+4 away from the current position of the thread front
-    txy_p.w = d_txy[(nxNz * (y+4)) + offset];
-    tyy_p.w = d_tyy[(nxNz * (y+4)) + offset];
-    tyz_p.w = d_tyz[(nxNz * (y+4)) + offset];
 
     __syncthreads();
 

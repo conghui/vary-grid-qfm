@@ -5,12 +5,12 @@ import fdmod,encode,wemig,stiffness,os
 # . . Set parameter for the modelling.  Applies for all situations.
 par = {
     # Space parameters
-    'nz':112,  'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
-    'nx':160,  'ox':0, 'dx':10,  'lx':'x', 'ux':'m',
+    'nz':88,  'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
+    'nx':88,  'ox':0, 'dx':10,  'lx':'x', 'ux':'m',
     'ny':64,   'oy':0, 'dy':10,  'ly':'y', 'uy':'m',
 
     # source location (only support one shot)
-    'sz': 0, 'sx':800, 'sy':320,
+    'sz': 0, 'sx':440, 'sy':320,
 
     # receiver locations
     'rnz':1,   'roz':0, 'rdz':10,
@@ -18,7 +18,7 @@ par = {
     'rny':2,   'roy':0, 'rdy':10,
 
     # Time Parameters
-    'nt':308,'ot':0, 'dt':0.002,  'lt':'t', 'ut':'s',
+    'nt':201,'ot':0, 'dt':0.002,  'lt':'t', 'ut':'s',
     'kt':100,'frq':10,
 
     # Modelling parameters

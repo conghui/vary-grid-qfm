@@ -1179,7 +1179,6 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
       sf_floatwrite(h_dd_combined, nr*nc, Fdat);
     }
 
-
   } // END MAIN LOOP
 
 }
@@ -1323,67 +1322,65 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
 
   /*------------------------------------------------------------*/
   /* deallocate GPU arrays */
-  /*
   for (int g = 0; g < ngpu; g++){
-    cudaFree(&d_ww[g]);
-    cudaFree(&d_dd[g]);
-    cudaFree(&d_bell[g]);
+    cudaFree(d_ww[g]);
+    cudaFree(d_dd[g]);
+    cudaFree(d_bell[g]);
 
-    cudaFree(&d_ro[g]);
-    cudaFree(&d_c11[g]);
-    cudaFree(&d_c22[g]);
-    cudaFree(&d_c33[g]);
-    cudaFree(&d_c44[g]);
-    cudaFree(&d_c55[g]);
-    cudaFree(&d_c66[g]);
-    cudaFree(&d_c12[g]);
-    cudaFree(&d_c13[g]);
-    cudaFree(&d_c23[g]);
+    cudaFree(d_ro[g]);
+    cudaFree(d_c11[g]);
+    cudaFree(d_c22[g]);
+    cudaFree(d_c33[g]);
+    cudaFree(d_c44[g]);
+    cudaFree(d_c55[g]);
+    cudaFree(d_c66[g]);
+    cudaFree(d_c12[g]);
+    cudaFree(d_c13[g]);
+    cudaFree(d_c23[g]);
 
     if (dabc){
-      cudaFree(&d_bzl_s[g]);
-      cudaFree(&d_bzh_s[g]);
-      cudaFree(&d_bxl_s[g]);
-      cudaFree(&d_bxh_s[g]);
-      cudaFree(&d_byl_s[0]);
-      cudaFree(&d_byh_s[ngpu-1]);
+      cudaFree(d_bzl_s[g]);
+      cudaFree(d_bzh_s[g]);
+      cudaFree(d_bxl_s[g]);
+      cudaFree(d_bxh_s[g]);
+      cudaFree(d_byl_s[0]);
+      cudaFree(d_byh_s[ngpu-1]);
     }
 
-    cudaFree(&d_umx[g]); cudaFree(&d_umy[g]); cudaFree(&d_umz[g]);
-    cudaFree(&d_uox[g]); cudaFree(&d_uoy[g]); cudaFree(&d_uoz[g]);
-    cudaFree(&d_upx[g]); cudaFree(&d_upy[g]); cudaFree(&d_upz[g]);
-    cudaFree(&d_uax[g]); cudaFree(&d_uay[g]); cudaFree(&d_uaz[g]);
+    cudaFree(d_umx[g]); cudaFree(d_umy[g]); cudaFree(d_umz[g]);
+    cudaFree(d_uox[g]); cudaFree(d_uoy[g]); cudaFree(d_uoz[g]);
+    cudaFree(d_upx[g]); cudaFree(d_upy[g]); cudaFree(d_upz[g]);
+    cudaFree(d_uax[g]); cudaFree(d_uay[g]); cudaFree(d_uaz[g]);
 
-    cudaFree(&d_tzz[g]); cudaFree(&d_tyy[g]); cudaFree(&d_txx[g]);
-    cudaFree(&d_txy[g]); cudaFree(&d_tyz[g]); cudaFree(&d_tzx[g]);
+    cudaFree(d_tzz[g]); cudaFree(d_tyy[g]); cudaFree(d_txx[g]);
+    cudaFree(d_txy[g]); cudaFree(d_tyz[g]); cudaFree(d_tzx[g]);
 
-    cudaFree(&d_Sjz[g]);
-    cudaFree(&d_Sjx[g]);
-    cudaFree(&d_Sjy[g]);
-    cudaFree(&d_Sw000[g]);
-    cudaFree(&d_Sw001[g]);
-    cudaFree(&d_Sw010[g]);
-    cudaFree(&d_Sw011[g]);
-    cudaFree(&d_Sw100[g]);
-    cudaFree(&d_Sw101[g]);
-    cudaFree(&d_Sw110[g]);
-    cudaFree(&d_Sw111[g]);
+    cudaFree(d_Sjz[g]);
+    cudaFree(d_Sjx[g]);
+    cudaFree(d_Sjy[g]);
+    cudaFree(d_Sw000[g]);
+    cudaFree(d_Sw001[g]);
+    cudaFree(d_Sw010[g]);
+    cudaFree(d_Sw011[g]);
+    cudaFree(d_Sw100[g]);
+    cudaFree(d_Sw101[g]);
+    cudaFree(d_Sw110[g]);
+    cudaFree(d_Sw111[g]);
 
-    cudaFree(&d_Rjz[g]);
-    cudaFree(&d_Rjx[g]);
-    cudaFree(&d_Rjy[g]);
+    cudaFree(d_Rjz[g]);
+    cudaFree(d_Rjx[g]);
+    cudaFree(d_Rjy[g]);
     if (interp){
-      cudaFree(&d_Rw000[g]);
-      cudaFree(&d_Rw001[g]);
-      cudaFree(&d_Rw010[g]);
-      cudaFree(&d_Rw011[g]);
-      cudaFree(&d_Rw100[g]);
-      cudaFree(&d_Rw101[g]);
-      cudaFree(&d_Rw110[g]);
-      cudaFree(&d_Rw111[g]);
+      cudaFree(d_Rw000[g]);
+      cudaFree(d_Rw001[g]);
+      cudaFree(d_Rw010[g]);
+      cudaFree(d_Rw011[g]);
+      cudaFree(d_Rw100[g]);
+      cudaFree(d_Rw101[g]);
+      cudaFree(d_Rw110[g]);
+      cudaFree(d_Rw111[g]);
     }
   }
-  */
 }
 
 // entry point
@@ -1552,8 +1549,6 @@ int main(int argc, char* argv[]) {
   init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
 
   int total_iter = 1;
-  for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
-    sf_warning("FORWARD BLOCK: %d", iblock);
     sf_warning("init cuda device ...");
     for (int g = 0; g < ngpu; g++){
       cudaSetDevice(g);
@@ -1561,6 +1556,8 @@ int main(int argc, char* argv[]) {
       cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
     }
     sf_warning("init cuda device finished");
+  for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
+    sf_warning("FORWARD BLOCK: %d", iblock);
 
     sf_axis curaz = sf_maxa(1,1,1); // dummy, update later
     sf_axis curax = sf_maxa(1,1,1); // dummy, update later
