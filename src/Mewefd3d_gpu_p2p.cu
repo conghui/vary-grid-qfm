@@ -381,8 +381,8 @@ static void setup_output_data(sf_file &Fdat, sf_axis &at, const sf_axis &ar, con
 static void set_output_wfd(sf_file &Fwfl, sf_axis &at, const sf_axis &az, const sf_axis &ax, const sf_axis &ay, const sf_axis &ac, int nt, float dt, int jsnap, bool verb)
 {
   int ntsnap=0;
-  for(int it=1; it<=nt; it++) {
-    if(it%jsnap==0) ntsnap++;
+  for(int it=0; it<nt; it++) {
+    if(it%jsnap==0 && it != 0) ntsnap++;
   }
   sf_setn(at,  ntsnap);
   sf_setd(at,dt*jsnap);
@@ -813,9 +813,9 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
 {
   int nb = fdm->nb;
   int nx = fdm->nx;
-
+  int end_iter = total_iter + nt;
   if(verb) fprintf(stderr,"\n");
-  for (int it=0; it<nt; it++, total_iter++) {
+  for (int it=total_iter; it< end_iter; it++, total_iter++) {
     if(verb) fprintf(stderr,"\b\b\b\b\b%d", total_iter);
 
     /*------------------------------------------------------------*/
@@ -1115,7 +1115,7 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
     /* cut wavefield and save                     */
     /*    - Step #9                       */
     /*------------------------------------------------------------*/
-    if(snap && total_iter%jsnap==0) {
+    if(snap && total_iter%jsnap==0 && total_iter != 0) {
       sf_warning("write wavefield files, total_iter: %d", total_iter);
       gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, uox, uoy, uoz, nyinterior, ngpu);
 
@@ -1553,7 +1553,7 @@ int main(int argc, char* argv[]) {
   float ***h_ro, ***h_c11, ***h_c22, ***h_c33, ***h_c44, ***h_c55, ***h_c66, ***h_c12, ***h_c13, ***h_c23;
   init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
 
-  int total_iter = 1;
+  int total_iter = 0;
   sf_warning("init cuda device ...");
   for (int g = 0; g < ngpu; g++){
     cudaSetDevice(g);
