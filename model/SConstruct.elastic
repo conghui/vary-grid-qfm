@@ -5,12 +5,12 @@ import fdmod,encode,wemig,stiffness,os
 # . . Set parameter for the modelling.  Applies for all situations.
 par = {
     # Space parameters
-    'nz':400,  'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
-    'nx':400,  'ox':0, 'dx':10,  'lx':'x', 'ux':'m',
+    'nz':112,  'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
+    'nx':160,  'ox':0, 'dx':10,  'lx':'x', 'ux':'m',
     'ny':64,   'oy':0, 'dy':10,  'ly':'y', 'uy':'m',
 
     # source location (only support one shot)
-    'sz': 0, 'sx':2000, 'sy':320,
+    'sz': 0, 'sx':800, 'sy':320,
 
     # receiver locations
     'rnz':1,   'roz':0, 'rdz':10,
@@ -28,7 +28,7 @@ par = {
     # Output
     'height':5,
 
-    'ngpu':2, 'timeblocks':1
+    'ngpu':1, 'timeblocks':2
     }
 
 # . . Initialize parameters in fdm module

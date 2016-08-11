@@ -181,7 +181,7 @@ static void interp_den_vel(const fdm3d &oldfdm, const fdm3d &newfdm, float ***ol
   newf = nu;
 }
 
-static void interp_host_den_vel_patch(const fdm3d &oldfdm, const fdm3d &newfdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
+static void interp_host_den_vel_patch(const fdm3d &oldfdm, const fdm3d &newfdm, const fdm3d &fullfdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
 {
   if (checksame(oldfdm, newfdm)) {
     sf_warning("old and new dimensions for den/vel are the same, don't need interpolatin");
@@ -209,9 +209,9 @@ static void interp_host_den_vel_patch(const fdm3d &oldfdm, const fdm3d &newfdm, 
       full_h_c13, full_h_c23,
       h_ro, h_c11, h_c22, h_c33, h_c44,
       h_c55, h_c66, h_c12, h_c13, h_c23,
-    oldfdm->nzpad, oldfdm->oz, oldfdm->dz,  /* old */
-    oldfdm->nxpad, oldfdm->ox, oldfdm->dx,
-    oldfdm->nypad, oldfdm->oy, oldfdm->dy,
+    fullfdm->nzpad, fullfdm->oz, fullfdm->dz,  /* old */
+    fullfdm->nxpad, fullfdm->ox, fullfdm->dx,
+    fullfdm->nypad, fullfdm->oy, fullfdm->dy,
     newfdm->nzpad, newfdm->oz, newfdm->dz,  /* new */
     newfdm->nxpad, newfdm->ox, newfdm->dx,
     newfdm->nypad, newfdm->oy, newfdm->dy);
@@ -1543,7 +1543,7 @@ int main(int argc, char* argv[]) {
     fdm3d fdm=fdutil3d_init(verb,fsrf,curaz, curax, curay, nb,1);
 
     sf_warning("iterpolating density and velocity");
-    interp_host_den_vel_patch(fullfdm, fdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+    interp_host_den_vel_patch(oldfdm, fdm, fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
 
     interp_host_umo(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
 

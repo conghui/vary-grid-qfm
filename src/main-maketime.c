@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
       float s2 = i2 * d2;
       float s3 = i3 * d3;
 
-      sf_warning("i2: (%d/%d), i3: (%d/%d)", i2, n2, i3, n3);
+      sf_warning("i2: (%d/%d), i3: (%d/%d)", i2 % j2, n4out, i3 % j3, n5out);
       fastmarch(time,v[0][0],flag,plane,
           n3,n2,n1,o3,o2,o1,d3,d2,d1,
           s3,s2,s1,1,1,1,order);
