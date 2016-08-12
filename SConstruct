@@ -11,7 +11,7 @@ additional_libs     = ['rsf', 'su']
 c_compiler   = ['/usr/bin/gcc', '-std=c99', '-march=native']
 cxx_compiler = ['/usr/bin/g++', '-fopenmp', '-march=native']
 linker       = ['/usr/bin/g++', '-fopenmp', '-march=native']
-cur_cflags   = ['-Wall', '-Wextra', '-fopenmp', '-O2', '-DNO_BLAS',]
+cur_cflags   = ['-Wall', '-Wextra', '-fopenmp', '-O3', '-DNO_BLAS',]
 cuda_cc      = ['nvcc', '--compiler-bindir', '/usr/bin/g++', '-arch=sm_35']
 cuda_flags   = ['-O2']
 

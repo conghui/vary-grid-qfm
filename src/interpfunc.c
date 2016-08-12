@@ -104,8 +104,8 @@ void make_sinc_table(float *sinc_table, int ntab, int lsinc) {
 }
 
 static void sinc_interp_init(
-    int *iaxis1, int *iaxis2, int *iaxis3, 
-    int *spt1, int *spt2, int *spt3, 
+    int *iaxis1, int *iaxis2, int *iaxis3,
+    int *spt1, int *spt2, int *spt3,
     int ntab,
     float o1, float d1,
     float o2, float d2,
@@ -147,8 +147,8 @@ static void sinc_interp_init(
 }
 
 static void sinc_interp3d_(const float *input, float *output, const float *sinc_table,
-    const int *iaxis1, const int *iaxis2, int *iaxis3, 
-    const int *spt1, const int *spt2, const int *spt3, 
+    const int *iaxis1, const int *iaxis2, int *iaxis3,
+    const int *spt1, const int *spt2, const int *spt3,
     int lsinc, int n1, int n2, int n3, int n1out, int n2out, int n3out)
 {
 #pragma omp parallel for schedule(dynamic, 1)
@@ -181,6 +181,49 @@ static void sinc_interp3d_(const float *input, float *output, const float *sinc_
   }
 }
 
+static void sinc_interp3d_n_(int narray, float **input, float **output, const float *sinc_table,
+    const int *iaxis1, const int *iaxis2, int *iaxis3,
+    const int *spt1, const int *spt2, const int *spt3,
+    int lsinc, int n1, int n2, int n3, int n1out, int n2out, int n3out)
+{
+#pragma omp parallel for schedule(dynamic, 1)
+  for(int i3=0; i3 < n3out; i3++){
+    for(int i2=0; i2 < n2out; i2++){
+      for(int i1=0; i1 < n1out; i1++){
+        int loc1,loc2,loc3;
+        float f1,f2,f3;
+
+        float val[narray];
+        for (int i = 0; i < narray; i++) {
+          val[i] = 0.0f;
+        }
+        for(int c=0; c<lsinc; c++){
+            loc3=iaxis3[i3]+c-lsinc/2+1;
+            loc3=MIN(MAX(loc3,0),n3-1);
+            f3=sinc_table[spt3[i3]*lsinc+c];
+          for(int b=0; b<lsinc; b++){
+              f2=sinc_table[spt2[i2]*lsinc+b];
+              loc2=iaxis2[i2]+b-lsinc/2+1;
+              loc2=MIN(MAX(loc2,0),n2-1);
+
+            for(int a=0; a<lsinc; a++){
+                f1=sinc_table[spt1[i1]*lsinc+a];
+                loc1=iaxis1[i1]+a-lsinc/2+1;
+                loc1=MIN(MAX(loc1,0),n1-1);
+                for (int i = 0; i < narray; i++) {
+                val[i]+=f1*f2*f3*input[i][loc1+loc2*n1+loc3*n2*n1];
+                }
+            }
+          }
+        }
+        for (int i = 0; i < narray; i++) {
+          output[i][i1+i2*n1out+i3*n1out*n2out]=val[i];
+
+        }
+      }
+    }
+  }
+}
 void sinc_interp3d_1(const float *input, float *output, const float *sinc_table,
     int ntab, int lsinc,
     int n1, float o1, float d1,
@@ -201,6 +244,31 @@ void sinc_interp3d_1(const float *input, float *output, const float *sinc_table,
   sinc_interp_init(iaxis1,  iaxis2,  iaxis3, spt1,  spt2,  spt3, ntab, o1, d1, o2, d2, o3, d3, n1out, o1out, d1out, n2out, o2out, d2out, n3out, o3out, d3out);
 
   sinc_interp3d_( input, output,  sinc_table, iaxis1,  iaxis2, iaxis3, spt1,  spt2,  spt3, lsinc, n1, n2, n3, n1out, n2out, n3out);
+
+  free(iaxis1); free(iaxis2); free(iaxis3);
+  free(spt1); free(spt2); free(spt3);
+}
+
+void sinc_interp3d_n(int narray, float **input, float **output, const float *sinc_table,
+    int ntab, int lsinc,
+    int n1, float o1, float d1,
+    int n2, float o2, float d2,
+    int n3, float o3, float d3,
+    int n1out, float o1out, float d1out,
+    int n2out, float o2out, float d2out,
+    int n3out, float o3out, float d3out)
+{
+
+  int *iaxis1=(int*) malloc(n1out*sizeof(int));
+  int *iaxis2=(int*) malloc(n2out*sizeof(int));
+  int *iaxis3=(int*) malloc(n3out*sizeof(int));
+  int *spt1=(int*) malloc(n1out*sizeof(int));
+  int *spt2=(int*) malloc(n2out*sizeof(int));
+  int *spt3=(int*) malloc(n3out*sizeof(int));
+
+  sinc_interp_init(iaxis1,  iaxis2,  iaxis3, spt1,  spt2,  spt3, ntab, o1, d1, o2, d2, o3, d3, n1out, o1out, d1out, n2out, o2out, d2out, n3out, o3out, d3out);
+
+  sinc_interp3d_n_( narray, input, output,  sinc_table, iaxis1,  iaxis2, iaxis3, spt1,  spt2,  spt3, lsinc, n1, n2, n3, n1out, n2out, n3out);
 
   free(iaxis1); free(iaxis2); free(iaxis3);
   free(spt1); free(spt2); free(spt3);
