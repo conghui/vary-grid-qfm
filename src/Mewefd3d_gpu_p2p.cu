@@ -7,7 +7,6 @@
 // - at the last time step of each time block main loop, update the global wavefield arrays
 
 #include <cuda.h>
-#include <cuda_runtime_api.h>
 
 extern "C" {
 #include <rsf.h>
@@ -16,6 +15,7 @@ extern "C" {
 #include "box.h"
 #include "resample.h"
 #include "check.h"
+#include "interpfunc.h"
 }
 
 #include <sys/time.h>
@@ -24,6 +24,92 @@ extern "C" {
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #define NOP 4 /* derivative operator half-size */
+
+bool checksame(const fdm3d &a, const fdm3d &b) {
+ return a->nzpad == b->nzpad && a->nxpad == b->nxpad &&  a->nypad == b->nypad &&
+        a->oz == b->oz &&  a->ox == b->ox &&  a->oy == b->oy &&
+        a->dz == b->dz &&  a->dx == b->dx &&  a->dy == b->dy;
+}
+
+static void sinc_interp3d_1_(const fdm3d &oldfdm, const fdm3d &newfdm, const float *sinc_table, int ntab, int lsinc, float ***u, float ***nu)
+{
+  sinc_interp3d_1(u[0][0], nu[0][0], sinc_table, ntab, lsinc,
+    oldfdm->nzpad, oldfdm->oz, oldfdm->dz,  /* old */
+    oldfdm->nxpad, oldfdm->ox, oldfdm->dx,
+    oldfdm->nypad, oldfdm->oy, oldfdm->dy,
+    newfdm->nzpad, newfdm->oz, newfdm->dz,  /* new */
+    newfdm->nxpad, newfdm->ox, newfdm->dx,
+    newfdm->nypad, newfdm->oy, newfdm->dy);
+}
+
+static void interp_host_den_vel_patch_2(const fdm3d &oldfdm, const fdm3d &newfdm, const fdm3d &fullfdm, const float *sinc_table, int ntab, int lsinc, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
+{
+  if (checksame(oldfdm, newfdm)) {
+    sf_warning("old and new dimensions for den/vel are the same, don't need interpolatin");
+    return;
+  }
+
+  struct timeval start, stop;
+  gettimeofday(&start, NULL);
+
+  free(**h_ro); free(*h_ro); free(h_ro); h_ro = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c11); free(*h_c11); free(h_c11); h_c11 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c22); free(*h_c22); free(h_c22); h_c22 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c33); free(*h_c33); free(h_c33); h_c33 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c44); free(*h_c44); free(h_c44); h_c44 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c55); free(*h_c55); free(h_c55); h_c55 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c66); free(*h_c66); free(h_c66); h_c66 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c12); free(*h_c12); free(h_c12); h_c12 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c13); free(*h_c13); free(h_c13); h_c13 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_c23); free(*h_c23); free(h_c23); h_c23 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+
+
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_ro, h_ro);
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_c11, h_c11);
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_c22, h_c22);
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_c33, h_c33);
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_c44, h_c44);
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_c55, h_c55);
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_c66, h_c66);
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_c12, h_c12);
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_c13, h_c13);
+  sinc_interp3d_1_(fullfdm, newfdm, sinc_table, ntab, lsinc, full_h_c23, h_c23);
+
+  gettimeofday(&stop, NULL);
+  float elapse = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec) * 1e-6;
+  fprintf(stderr, "time for interpolate density and velocities: %.2f\n", elapse);
+}
+
+static void interp_host_umo_patch_2(const fdm3d &oldfdm, const fdm3d &newfdm, const float *sinc_table, int ntab, int lsinc, float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
+{
+  struct timeval start, stop;
+  gettimeofday(&start, NULL);
+
+  float ***n_umx = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_umy = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_umz = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_uox = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_uoy = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  float ***n_uoz = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+
+  sinc_interp3d_1_(oldfdm, newfdm, sinc_table, ntab, lsinc, h_umx, n_umx);
+  sinc_interp3d_1_(oldfdm, newfdm, sinc_table, ntab, lsinc, h_umy, n_umy);
+  sinc_interp3d_1_(oldfdm, newfdm, sinc_table, ntab, lsinc, h_umz, n_umz);
+  sinc_interp3d_1_(oldfdm, newfdm, sinc_table, ntab, lsinc, h_uox, n_uox);
+  sinc_interp3d_1_(oldfdm, newfdm, sinc_table, ntab, lsinc, h_uoy, n_uoy);
+  sinc_interp3d_1_(oldfdm, newfdm, sinc_table, ntab, lsinc, h_uoz, n_uoz);
+
+  free(**h_umx); free(*h_umx); free(h_umx); h_umx = n_umx;
+  free(**h_umy); free(*h_umy); free(h_umy); h_umy = n_umy;
+  free(**h_umz); free(*h_umz); free(h_umz); h_umz = n_umz;
+  free(**h_uox); free(*h_uox); free(h_uox); h_uox = n_uox;
+  free(**h_uoy); free(*h_uoy); free(h_uoy); h_uoy = n_uoy;
+  free(**h_uoz); free(*h_uoz); free(h_uoz); h_uoz = n_uoz;
+
+  gettimeofday(&stop, NULL);
+  float elapse = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec) * 1e-6;
+  fprintf(stderr, "time for interpolate wavefields: %.2f\n", elapse);
+}
 
 static void scatter_to_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h_uz, float **d_uox, float **d_uoy, float **d_uoz, float ***uox, float ***uoy, float ***uoz, int nyinterior, int ngpu)
 {
@@ -125,11 +211,6 @@ static void release_host_den_vel(float ***&h_ro, float ***&h_c11, float ***&h_c2
   free(**h_c23); free(*h_c23); free(h_c23);
 }
 
-bool checksame(const fdm3d &a, const fdm3d &b) {
- return a->nzpad == b->nzpad && a->nxpad == b->nxpad &&  a->nypad == b->nypad &&
-        a->oz == b->oz &&  a->ox == b->ox &&  a->oy == b->oy &&
-        a->dz == b->dz &&  a->dx == b->dx &&  a->dy == b->dy;
-}
 
 static void interp_wavefield(const fdm3d &oldfdm, const fdm3d &newfdm, float ***&u)
 {
@@ -326,6 +407,7 @@ static void sf_check_gpu_error (const char *msg) {
 }
 
 static void update_axis(const fdm3d &fdm, sf_axis &az, sf_axis &ax, sf_axis &ay, bool verb) {
+  sf_warning("extended dimensions:");
   sf_setn(az,fdm->nzpad); sf_seto(az,fdm->ozpad); if(verb) sf_raxa(az);
   sf_setn(ax,fdm->nxpad); sf_seto(ax,fdm->oxpad); if(verb) sf_raxa(ax);
   sf_setn(ay,fdm->nypad); sf_seto(ay,fdm->oypad); if(verb) sf_raxa(ay);
@@ -401,6 +483,7 @@ static void set_output_wfd_time_block(sf_file &Fwfl, sf_axis &at, const sf_axis 
     if(it%jsnap==0) ntsnap++;
   }
   sf_setn(at,  ntsnap);
+  sf_seto(at, total_iter * dt);
   sf_setd(at,dt*jsnap);
   if(verb) sf_raxa(at);
 
@@ -1304,9 +1387,11 @@ static void make_axis(const fdm3d &fullfdm, modeling_t *m, int ngpu, sf_axis &az
   //ax = sf_maxa(m->n2 - 2 * m->nb, m->o2 + m->nb * m->d2, m->d2);
   //ay = sf_maxa(m->n3 - 2 * m->nb, m->o3 + m->nb * m->d3, m->d3);
 
-  az = sf_maxa(n1, m->o1 + m->nb * m->d1, m->d1);
-  ax = sf_maxa(n2, m->o2 + m->nb * m->d2, m->d2);
-  ay = sf_maxa(n3, m->o3 + m->nb * m->d3, m->d3);
+  sf_warning("actual dimensions");
+  az = sf_maxa(n1, m->o1 + m->nb * m->d1, m->d1); sf_raxa(az);
+  ax = sf_maxa(n2, m->o2 + m->nb * m->d2, m->d2); sf_raxa(ax);
+  ay = sf_maxa(n3, m->o3 + m->nb * m->d3, m->d3); sf_raxa(ay);
+  sf_warning("========>");
 }
 
 
@@ -1636,6 +1721,13 @@ int main(int argc, char* argv[]) {
     cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   }
   sf_warning("init cuda device finished");
+
+  sf_warning("init sinc table");
+  int ntab = 10000;
+  int lsinc = 8;
+  float *sinc_table = (float *)malloc(ntab * lsinc * sizeof *sinc_table);
+  make_sinc_table(sinc_table, ntab, lsinc);
+
   for (int iblock = 0; iblock < domain->timeblocks; iblock++) {
     sf_warning("FORWARD BLOCK: %d", iblock);
 
@@ -1662,10 +1754,10 @@ int main(int argc, char* argv[]) {
     if (snap)  set_output_wfd_time_block(Fwfl, at, curaz, curax, curay, ac, curnt, total_iter, curdt, jsnap, verb);
 
     sf_warning("iterpolating density and velocity");
-    interp_host_den_vel_patch(oldfdm, fdm, fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+    interp_host_den_vel_patch_2(oldfdm, fdm, fullfdm, sinc_table, ntab, lsinc, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
 
     sf_warning("iterpolating wavefields");
-    interp_host_umo_patch(oldfdm, fdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
+    interp_host_umo_patch_2(oldfdm, fdm, sinc_table, ntab, lsinc, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
 
     run(Fwfl, Fdat, fdm, fullfdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, h_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
 

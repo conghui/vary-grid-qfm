@@ -4,6 +4,8 @@ Import('*')
 cuda_bin_list = [
     ("elastic", "Mewefd3d_gpu_p2p.cu"),
     ("maketime", "main-maketime.c"),
+    ("interp", "sin2.c"),
+    ("cuInterp", "Minterp.cu"),
 ]
 
 cuda_module = """
@@ -14,6 +16,7 @@ resample.c
 check.c
 fastmarch.c
 ewefd3d_kernels.cu
+interpfunc.c
 """.split()
 
 include_dir = [
