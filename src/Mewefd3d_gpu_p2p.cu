@@ -394,6 +394,22 @@ static void set_output_wfd(sf_file &Fwfl, sf_axis &at, const sf_axis &az, const 
   sf_oaxa(Fwfl,ac, 4);
   sf_oaxa(Fwfl,at, 5);
 }
+static void set_output_wfd_time_block(sf_file &Fwfl, sf_axis &at, const sf_axis &az, const sf_axis &ax, const sf_axis &ay, const sf_axis &ac, int nt, int total_iter, float dt, int jsnap, bool verb)
+{
+  int ntsnap=0;
+  for(int it=total_iter; it<total_iter+nt; it++) {
+    if(it%jsnap==0) ntsnap++;
+  }
+  sf_setn(at,  ntsnap);
+  sf_setd(at,dt*jsnap);
+  if(verb) sf_raxa(at);
+
+  sf_oaxa(Fwfl,az,1);
+  sf_oaxa(Fwfl,ax,2);
+  sf_oaxa(Fwfl,ay,3);
+  sf_oaxa(Fwfl,ac, 4);
+  sf_oaxa(Fwfl,at, 5);
+}
 static void alloc_wlf(const fdm3d &fdm, float *** &uoz, float *** &uox, float *** &uoy, float *&h_uoz, float *&h_uox, float *&h_uoy, float ***&uc, int nyinterior)
 {
     // Used to accumulate wavefield data from other GPUs
@@ -1171,28 +1187,31 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
     /* cut wavefield and save                     */
     /*    - Step #9                       */
     /*------------------------------------------------------------*/
-    if(snap && total_iter%jsnap==0 && total_iter != 0) {
+    if(snap && total_iter%jsnap==0) {
       sf_warning("write wavefield files, total_iter: %d", total_iter);
       gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, uox, uoy, uoz, nyinterior, ngpu);
 
       float ***nuc = sf_floatalloc3(fullfdm->nzpad, fullfdm->nxpad, fullfdm->nypad);
 
       // Write wavefield arrays to output file
-      cut3d(uoz,uc,fdm,az,ax,ay);
       sf_warning("interpolate wavefields and dump them to disks");
-      interp_wavefield_force(fdm, fullfdm, uc, nuc);
-      sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
-      //sf_floatwrite(uc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+      sf_warning("nzad: %d, nxpad: %d, nypad: %d", fdm->nzpad, fdm->nxpad, fdm->nypad);
+      int size = fdm->nzpad * fdm->nxpad * fdm->nypad;
+      sf_warning("# of elements for one component: %d", size);
+      cut3d(uoz,uc,fdm,az,ax,ay);
+      //interp_wavefield_force(fdm, fullfdm, uc, nuc);
+      //sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+      sf_floatwrite(uc[0][0], size, Fwfl);
 
       cut3d(uox,uc,fdm,az,ax,ay);
-      interp_wavefield_force(fdm, fullfdm, uc, nuc);
-      sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
-      //sf_floatwrite(uc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+      //interp_wavefield_force(fdm, fullfdm, uc, nuc);
+      //sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+      sf_floatwrite(uc[0][0],size, Fwfl);
 
       cut3d(uoy,uc,fdm,az,ax,ay);
-      interp_wavefield_force(fdm, fullfdm, uc, nuc);
-      sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
-      //sf_floatwrite(uc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+      //interp_wavefield_force(fdm, fullfdm, uc, nuc);
+      //sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+      sf_floatwrite(uc[0][0],size, Fwfl);
 
       free(**nuc); free(*nuc); free(nuc);
     }
@@ -1319,9 +1338,6 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
   float **d_bell = setup_bell(nbell, ngpu);
   /*------------------------------------------------------------*/
 
-  // TODO: put time block stuff here
-  /* expand domain for FD operators and ABC */
-  update_axis(fdm, az, ax, ay, verb);
 
   /*------------------------------------------------------------*/
   /* compute sub-domain dimmensions (domain decomposition) */
@@ -1637,6 +1653,13 @@ int main(int argc, char* argv[]) {
 
     fdm3d fdm=fdutil3d_init(verb,fsrf,curaz, curax, curay, nb,1);
     //fdm3d fdm=fullfdm;
+
+    update_axis(fdm, curaz, curax, curay, verb);
+
+    char fn[512];
+    sprintf(fn, "VTIw-3d-GPU-b%d.rsf", iblock);
+    sf_file Fwfl = sf_output(fn);
+    if (snap)  set_output_wfd_time_block(Fwfl, at, curaz, curax, curay, ac, curnt, total_iter, curdt, jsnap, verb);
 
     sf_warning("iterpolating density and velocity");
     interp_host_den_vel_patch(oldfdm, fdm, fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
