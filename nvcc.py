@@ -54,9 +54,6 @@ def add_common_nvcc_variables(env):
     env['_NVCCWRAPSHCFLAGS'] =   '${_concat("-Xcompiler ", SHCFLAGS,   "", __env__)}'
     env['_NVCCWRAPCCFLAGS'] =    '${_concat("-Xcompiler ", CCFLAGS,    "", __env__)}'
     env['_NVCCWRAPSHCCFLAGS'] =  '${_concat("-Xcompiler ", SHCCFLAGS,  "", __env__)}'
-    # XXX should these be wrapped as well?  not sure -jph
-    #env['_NVCCWRAPCXXFLAGS'] =   '${_concat("-Xcompiler ", CXXFLAGS,   "", __env__)}'
-    #env['_NVCCWRAPSHCXXFLAGS'] = '${_concat("-Xcompiler ", SHCXXFLAGS, "", __env__)}'
 
 def generate(env):
   """
@@ -78,16 +75,13 @@ def generate(env):
   add_common_nvcc_variables(env)
 
   # set the "CUDA Compiler Command" environment variable
-  env['NVCC'] = 'nvcc --compiler-bindir /usr/bin/gcc -O2'
-  env['SHNVCC'] = 'nvcc --compiler-bindir /usr/bin/gcc -O2'
+  env['NVCC'] = 'nvcc'
 
   # set the include path, and pass both c compiler flags and c++ compiler flags
   env['NVCCFLAGS'] = SCons.Util.CLVar('')
-  env['SHNVCCFLAGS'] = SCons.Util.CLVar('') + ' -shared'
 
   # 'NVCC Command'
   env['NVCCCOM']   = '$NVCC -o $TARGET -c $NVCCFLAGS $_NVCCWRAPCFLAGS $_NVCCWRAPCCFLAGS $_NVCCCOMCOM $SOURCES'
-  env['SHNVCCCOM'] = '$SHNVCC -o $TARGET -c $SHNVCCFLAGS $_NVCCWRAPSHCFLAGS $_NVCCWRAPSHCCFLAGS $_NVCCCOMCOM $SOURCES'
 
   # the suffix of CUDA source files is '.cu'
   env['CUDAFILESUFFIX'] = '.cu'
@@ -96,7 +90,6 @@ def generate(env):
   nvccPath = which(command)
   cudaRoot = nvccPath[:-len(command + 'bin/')];
   exe_path = cudaRoot + 'bin'
-  lib_path = cudaRoot + 'lib64'
 
   env.PrependENVPath('PATH', exe_path)
 

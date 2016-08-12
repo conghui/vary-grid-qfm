@@ -8,10 +8,12 @@ additional_includes = [os.environ['RSFROOT'] + '/include']
 additional_libpath  = [os.environ['RSFROOT'] + '/lib']
 additional_libs     = ['rsf', 'su']
 
-c_compiler    = ['/usr/bin/gcc',  '-std=c99']
-cxx_compiler  = ['g++', '-fopenmp']
-cur_cflags    = ['-Wall', '-Wextra', '-fopenmp', '-g', '-O2', '-DNO_BLAS',]
-cuda_cc       = ['nvcc', '--compiler-bindir', '/usr/bin/gcc', '-arch=sm_35', '-O2']
+c_compiler   = ['/usr/bin/gcc', '-std=c99', '-march=native']
+cxx_compiler = ['/usr/bin/g++', '-fopenmp', '-march=native']
+linker       = ['/usr/bin/g++', '-fopenmp', '-march=native']
+cur_cflags   = ['-Wall', '-Wextra', '-fopenmp', '-O2', '-DNO_BLAS',]
+cuda_cc      = ['nvcc', '--compiler-bindir', '/usr/bin/g++', '-arch=sm_35']
+cuda_flags   = ['-O2']
 
 # set the sub directories (key, value), where value is the name of directory#{{{
 # please make sure the source code are in src subdirectory
@@ -41,6 +43,8 @@ cudaenv     = Environment(
                   LIBS    = libs,
                   LINK    = [cuda_cc] +  '-Xcompiler -fopenmp'.split())
 cudaenv.Tool('nvcc', toolpath='./nvcc.py')
+cudaenv.Replace(NVCC = cuda_cc)
+cudaenv.Prepend(NVCCFLAGS = cuda_flags)
 #}}}
 
 # compile#{{{

@@ -5,7 +5,6 @@ cuda_bin_list = [
     ("elastic", "Mewefd3d_gpu_p2p.cu"),
     ("maketime", "main-maketime.c"),
     ("interp", "sin2.c"),
-    ("cuInterp", "Minterp.cu"),
 ]
 
 cuda_module = """
