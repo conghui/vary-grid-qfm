@@ -1541,7 +1541,7 @@ int main(int argc, char* argv[]) {
     int curnt = cur->ntblock; sf_warning("curnt: %d", curnt);
     float curdt = dt;
     sf_warning("dt: %f, cur->dt: %f", curdt, cur->dt);
-    assert(fabs(curdt - cur->dt) < 0.0001);
+    //assert(fabs(curdt - cur->dt) < 0.0001);
 
     make_axis(fullfdm, cur, ngpu, curaz, curax, curay);
 

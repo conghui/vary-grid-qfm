@@ -117,7 +117,7 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
 
   float dtmax = 0.49 * dsamp / vmax;
   mod->dt = calgoodsampling(dtmax);
-  mod->dt = gs_dt; // TODO: update dt
+  /*mod->dt = gs_dt; // TODO: update dt*/
   mod->ntblock = (timemax - timemin) / mod->dt;
   mod->dtextra = (timemax - timemin) - mod->dt * mod->ntblock;
 
