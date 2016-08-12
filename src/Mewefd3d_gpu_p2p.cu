@@ -468,10 +468,66 @@ static void setup_src_rcv_cord(sf_file &Fsou, sf_file &Frec, pt3d *&ss, pt3d *&r
   pt3dread1(Frec,rr,nr,3); /* read (x,y,z) coordinates */
 
 }
-static void setup_interp_cooef(float **&d_Sw000, float **&d_Sw001, float **&d_Sw010, float **&d_Sw011, float **&d_Sw100, float **&d_Sw101, float **&d_Sw110, float **&d_Sw111, int **&d_Sjz, int **&d_Sjx, int **&d_Sjy, const fdm3d &fdm, pt3d *ss, int ns, int ngpu)
+static void setup_interp_cooef_receiver(float **&d_Rw000, float **&d_Rw001, float **&d_Rw010, float **&d_Rw011, float **&d_Rw100, float **&d_Rw101, float **&d_Rw110, float **&d_Rw111, int **&d_Rjz, int **&d_Rjx, int **&d_Rjy, const fdm3d &fdm, pt3d *rr, int nr, int ngpu)
+{
+  /* calculate 3d linear interpolation coefficients for receiver locations and copy to each GPU*/
+  lint3d cr = lint3d_make(nr,rr,fdm);
+  d_Rw000 = (float**)malloc(ngpu*sizeof(float*));
+  d_Rw001 = (float**)malloc(ngpu*sizeof(float*));
+  d_Rw010 = (float**)malloc(ngpu*sizeof(float*));
+  d_Rw011 = (float**)malloc(ngpu*sizeof(float*));
+  d_Rw100 = (float**)malloc(ngpu*sizeof(float*));
+  d_Rw101 = (float**)malloc(ngpu*sizeof(float*));
+  d_Rw110 = (float**)malloc(ngpu*sizeof(float*));
+  d_Rw111 = (float**)malloc(ngpu*sizeof(float*));
+
+  for (int g = 0; g < ngpu; g++){
+    cudaSetDevice(g);
+    cudaMalloc(&d_Rw000[g], nr * sizeof(float));
+    cudaMalloc(&d_Rw001[g], nr * sizeof(float));
+    cudaMalloc(&d_Rw010[g], nr * sizeof(float));
+    cudaMalloc(&d_Rw011[g], nr * sizeof(float));
+    cudaMalloc(&d_Rw100[g], nr * sizeof(float));
+    cudaMalloc(&d_Rw101[g], nr * sizeof(float));
+    cudaMalloc(&d_Rw110[g], nr * sizeof(float));
+    cudaMalloc(&d_Rw111[g], nr * sizeof(float));
+    sf_check_gpu_error("cudaMalloc receiver interpolation coefficients to device");
+    cudaMemcpy(d_Rw000[g], cr->w000, nr * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_Rw001[g], cr->w001, nr * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_Rw010[g], cr->w010, nr * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_Rw011[g], cr->w011, nr * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_Rw100[g], cr->w100, nr * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_Rw101[g], cr->w101, nr * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_Rw110[g], cr->w110, nr * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_Rw111[g], cr->w111, nr * sizeof(float), cudaMemcpyDefault);
+    sf_check_gpu_error("copy receiver interpolation coefficients to device");
+
+  }
+
+  // z, x, and y coordinates of each receiver
+  d_Rjz = (int**)malloc(ngpu*sizeof(int*));
+  d_Rjx = (int**)malloc(ngpu*sizeof(int*));
+  d_Rjy = (int**)malloc(ngpu*sizeof(int*));
+  for (int g = 0; g < ngpu; g++){
+    cudaSetDevice(g);
+    cudaMalloc(&d_Rjz[g], nr * sizeof(int));
+    cudaMalloc(&d_Rjx[g], nr * sizeof(int));
+    cudaMalloc(&d_Rjy[g], nr * sizeof(int));
+    sf_check_gpu_error("cudaMalloc receiver coords to device");
+    cudaMemcpy(d_Rjz[g], cr->jz, nr * sizeof(int), cudaMemcpyDefault);
+    cudaMemcpy(d_Rjx[g], cr->jx, nr * sizeof(int), cudaMemcpyDefault);
+    cudaMemcpy(d_Rjy[g], cr->jy, nr * sizeof(int), cudaMemcpyDefault);
+    sf_check_gpu_error("copy receiver coords to device");
+  }
+}
+static void setup_interp_cooef_source(float **&d_Sw000, float **&d_Sw001, float **&d_Sw010, float **&d_Sw011, float **&d_Sw100, float **&d_Sw101, float **&d_Sw110, float **&d_Sw111, int **&d_Sjz, int **&d_Sjx, int **&d_Sjy, const fdm3d &fdm, pt3d *ss, int ns, int ngpu)
 {
   /* calculate 3d linear interpolation coefficients for source locations and copy to each GPU*/
   lint3d cs = lint3d_make(ns,ss,fdm);
+  for (int i = 0; i < ns; i++) {
+    sf_warning("cs->jz[%d]: %d, cs->jx[%d]: %d, cs->jy[%d]: %d", i, cs->jz[i], i, cs->jx[i], i, cs->jy[i]);
+  }
+
   d_Sw000 = (float**)malloc(ngpu*sizeof(float*));
   d_Sw001 = (float**)malloc(ngpu*sizeof(float*));
   d_Sw010 = (float**)malloc(ngpu*sizeof(float*));
@@ -1126,14 +1182,17 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d 
       sf_warning("interpolate wavefields and dump them to disks");
       interp_wavefield_force(fdm, fullfdm, uc, nuc);
       sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+      //sf_floatwrite(uc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
 
       cut3d(uox,uc,fdm,az,ax,ay);
       interp_wavefield_force(fdm, fullfdm, uc, nuc);
       sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+      //sf_floatwrite(uc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
 
       cut3d(uoy,uc,fdm,az,ax,ay);
       interp_wavefield_force(fdm, fullfdm, uc, nuc);
       sf_floatwrite(nuc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
+      //sf_floatwrite(uc[0][0],fullfdm->nzpad * fullfdm->nxpad * fullfdm->nypad, Fwfl);
 
       free(**nuc); free(*nuc); free(nuc);
     }
@@ -1280,8 +1339,8 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, const fdm3d &fullf
   int **d_Rjz,  **d_Rjx,  **d_Rjy;
 
   /* calculate 3d linear interpolation coefficients for source/receiver locations and copy to each GPU*/
-  setup_interp_cooef(d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, fdm, ss, ns, ngpu);
-  setup_interp_cooef(d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, fdm, rr, nr, ngpu);
+  setup_interp_cooef_source  (d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, fdm, ss, ns, ngpu);
+  setup_interp_cooef_receiver(d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, fdm, rr, nr, ngpu);
 
   setup_fd_cooef(fdm, idz, idx, idy);
   float **d_ro ,  **d_c11,  **d_c22,  **d_c33,  **d_c44,  **d_c55,  **d_c66,  **d_c12,  **d_c13,  **d_c23;
@@ -1577,6 +1636,7 @@ int main(int argc, char* argv[]) {
     make_axis(fullfdm, cur, ngpu, curaz, curax, curay);
 
     fdm3d fdm=fdutil3d_init(verb,fsrf,curaz, curax, curay, nb,1);
+    //fdm3d fdm=fullfdm;
 
     sf_warning("iterpolating density and velocity");
     interp_host_den_vel_patch(oldfdm, fdm, fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);

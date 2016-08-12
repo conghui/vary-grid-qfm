@@ -497,66 +497,66 @@ lint3d lint3d_make(int    na,
 		   fdm3d fdm)
 /*< init 3D linear interpolation >*/
 {
-    lint3d ca;
-    int    ia;
-    float f1,f2,f3;
+  lint3d ca;
+  int    ia;
+  float f1,f2,f3;
 
-    ca = (lint3d) sf_alloc(1,sizeof(*ca));
+  ca = (lint3d) sf_alloc(1,sizeof(*ca));
 
-    ca->n = na;
+  ca->n = na;
 
-    ca->w000 = sf_floatalloc(na);
-    ca->w001 = sf_floatalloc(na);
-    ca->w010 = sf_floatalloc(na);
-    ca->w011 = sf_floatalloc(na);
-    ca->w100 = sf_floatalloc(na);
-    ca->w101 = sf_floatalloc(na);
-    ca->w110 = sf_floatalloc(na);
-    ca->w111 = sf_floatalloc(na);
+  ca->w000 = sf_floatalloc(na);
+  ca->w001 = sf_floatalloc(na);
+  ca->w010 = sf_floatalloc(na);
+  ca->w011 = sf_floatalloc(na);
+  ca->w100 = sf_floatalloc(na);
+  ca->w101 = sf_floatalloc(na);
+  ca->w110 = sf_floatalloc(na);
+  ca->w111 = sf_floatalloc(na);
 
-    ca->jz  = sf_intalloc(na);
-    ca->jx  = sf_intalloc(na);
-    ca->jy  = sf_intalloc(na);
+  ca->jz  = sf_intalloc(na);
+  ca->jx  = sf_intalloc(na);
+  ca->jy  = sf_intalloc(na);
 
-    for (ia=0;ia<na;ia++) {
+  for (ia=0;ia<na;ia++) {
 
-	if(aa[ia].z >= fdm->ozpad &&
-	   aa[ia].z <  fdm->ozpad + (fdm->nzpad-1)*fdm->dz &&
-	   aa[ia].x >= fdm->oxpad &&
-	   aa[ia].x <  fdm->oxpad + (fdm->nxpad-1)*fdm->dx &&
-	   aa[ia].y >= fdm->oypad &&
-	   aa[ia].y <  fdm->oypad + (fdm->nypad-1)*fdm->dy  ) {
+    if(aa[ia].z >= fdm->ozpad &&
+        aa[ia].z <  fdm->ozpad + (fdm->nzpad-1)*fdm->dz &&
+        aa[ia].x >= fdm->oxpad &&
+        aa[ia].x <  fdm->oxpad + (fdm->nxpad-1)*fdm->dx &&
+        aa[ia].y >= fdm->oypad &&
+        aa[ia].y <  fdm->oypad + (fdm->nypad-1)*fdm->dy  ) {
 
-	    ca->jz[ia] = (int)( (aa[ia].z-fdm->ozpad)/fdm->dz);
-	    ca->jx[ia] = (int)( (aa[ia].x-fdm->oxpad)/fdm->dx);
-	    ca->jy[ia] = (int)( (aa[ia].y-fdm->oypad)/fdm->dy);
+      ca->jz[ia] = roundf( (aa[ia].z-fdm->ozpad)/fdm->dz);
+      ca->jx[ia] = roundf( (aa[ia].x-fdm->oxpad)/fdm->dx);
+      ca->jy[ia] = roundf( (aa[ia].y-fdm->oypad)/fdm->dy);
 
-	    f1 = (aa[ia].z-fdm->ozpad)/fdm->dz - ca->jz[ia];
-	    f2 = (aa[ia].x-fdm->oxpad)/fdm->dx - ca->jx[ia];
-	    f3 = (aa[ia].y-fdm->oypad)/fdm->dy - ca->jy[ia];
+      f1 = (aa[ia].z-fdm->ozpad)/fdm->dz - ca->jz[ia];
+      f2 = (aa[ia].x-fdm->oxpad)/fdm->dx - ca->jx[ia];
+      f3 = (aa[ia].y-fdm->oypad)/fdm->dy - ca->jy[ia];
 
-	} else {
-	    ca->jz[ia] = 0;
-	    ca->jx[ia] = 0;
-	    ca->jy[ia] = 0;
+    } else {
+      ca->jz[ia] = 0;
+      ca->jx[ia] = 0;
+      ca->jy[ia] = 0;
 
-	    f1 = 1;
-	    f2 = 0;
-	    f3 = 0;
-	}
-
-	ca->w000[ia] = (1-f3)*(1-f1)*(1-f2);
-	ca->w001[ia] = (1-f3)*(  f1)*(1-f2);
-	ca->w010[ia] = (1-f3)*(1-f1)*(  f2);
-	ca->w011[ia] = (1-f3)*(  f1)*(  f2);
-
-	ca->w100[ia] = (  f3)*(1-f1)*(1-f2);
-	ca->w101[ia] = (  f3)*(  f1)*(1-f2);
-	ca->w110[ia] = (  f3)*(1-f1)*(  f2);
-	ca->w111[ia] = (  f3)*(  f1)*(  f2);
+      f1 = 1;
+      f2 = 0;
+      f3 = 0;
     }
 
-    return ca;
+    ca->w000[ia] = (1-f3)*(1-f1)*(1-f2);
+    ca->w001[ia] = (1-f3)*(  f1)*(1-f2);
+    ca->w010[ia] = (1-f3)*(1-f1)*(  f2);
+    ca->w011[ia] = (1-f3)*(  f1)*(  f2);
+
+    ca->w100[ia] = (  f3)*(1-f1)*(1-f2);
+    ca->w101[ia] = (  f3)*(  f1)*(1-f2);
+    ca->w110[ia] = (  f3)*(1-f1)*(  f2);
+    ca->w111[ia] = (  f3)*(  f1)*(  f2);
+  }
+
+  return ca;
 }
 
 
