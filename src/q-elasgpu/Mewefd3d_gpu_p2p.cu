@@ -786,7 +786,10 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, float **d_um
   int nx = fdm->nx;
   int end_iter = total_iter + nt;
   if(verb) fprintf(stderr,"\n");
+  struct timeval start, stop;
+
   for (int it=total_iter; it< end_iter; it++, total_iter++) {
+    gettimeofday(&start, NULL);
     if(verb) fprintf(stderr,"\b\b\b\b\b%d", total_iter);
 
     /*------------------------------------------------------------*/
@@ -1144,6 +1147,9 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, float **d_um
       sf_floatwrite(h_dd_combined, nr*nc, Fdat);
     }
 
+    gettimeofday(&stop, NULL);
+    float elapse = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec) * 1e-6;
+    sf_warning("time elapsed iter %d: %.4f", total_iter, elapse);
   } // END MAIN LOOP
 
 }

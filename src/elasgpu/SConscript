@@ -1,0 +1,26 @@
+import os
+Import('*')
+
+cuda_bin_list = [
+    ("efd3d_gpu", "Mewefd3d_gpu_p2p.cu"),
+]
+
+cuda_module = """
+fdutil.c
+""".split()
+
+include_dir = [
+]
+
+depend_libpath = []
+depend_libs = []
+
+mycudaenv = cudaenv.Clone(CPPPATH = include_dir)
+mycudaenv.Append(LIBPATH = depend_libpath)
+mycudaenv.Append(LIBS = depend_libs)
+cudaobjs = mycudaenv.StaticObject(cuda_module)
+
+for bin in cuda_bin_list:
+  bin_obj = mycudaenv.StaticObject(bin[1])
+  bin_target = mycudaenv.Program(target = bin[0], source = bin_obj + cudaobjs)
+  mycudaenv.Install("#" + dirs['bin'], bin_target)

@@ -20,7 +20,9 @@ cuda_flags   = ['-O2']
 dirlist = [
    ('lib', 'lib'),
    ('bin', 'bin'),
-   ('src', 'src'),
+   ('q-elasgpu', 'src/q-elasgpu'),
+   ('elasgpu', 'src/elasgpu'),
+   ('elascpu', 'src/elascpu'),
 ]
 dirs = dict(dirlist)
 #}}}
