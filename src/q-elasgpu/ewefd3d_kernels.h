@@ -8,7 +8,7 @@ __global__ void computeRo(float *d_ro, float dt, int nxpad, int nzpad, int nyint
 __global__ void dispToStrain(int nxpad, int nylocal, int nzpad, float *d_uox, float *d_uoy, float *d_uoz, float *d_txx, float *d_tyy, float *d_tzz, float *d_txy, float *d_tyz, float *d_tzx, float idx, float idy, float idz);
 
 __global__ void strainToStress(int gpuID, int nxpad, int nzpad, int nyinterior, float *d_c11, float *d_c12, float *d_c13, float *d_c22, float *d_c23, float *d_c33, float *d_c44, float *d_c55, float *d_c66, float *d_txx, float *d_tyy, float *d_tzz, float *d_txy, float *d_tyz, float *d_tzx);
-__global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior, float dt, float *d_c11, float *d_c12, float *d_c13, float *d_c22, float *d_c23, float *d_c33, float *d_c44, float *d_c55, float *d_c66, float *d_txx, float *d_tyy, float *d_tzz, float *d_txy, float *d_tyz, float *d_tzx, float *vp, float *vs);
+__global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior, float dt, float *d_c11, float *d_c12, float *d_c13, float *d_c22, float *d_c23, float *d_c33, float *d_c44, float *d_c55, float *d_c66, float *d_txx, float *d_tyy, float *d_tzz, float *d_txy, float *d_tyz, float *d_tzx, float *vp, float *vs, float qp, float qs);
 
 __global__ void freeSurf(int gpuID, int nxpad, int nyinterior, int nzpad, int nb, float *d_tzz, float *d_tyz, float *d_tzx);
 

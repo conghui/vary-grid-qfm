@@ -403,7 +403,7 @@ __global__ void strainToStress(int gpuID, int nxpad, int nzpad, int nyinterior, 
 
 }
 
-__global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior, float dt, float *d_c11, float *d_c12, float *d_c13, float *d_c22, float *d_c23, float *d_c33, float *d_c44, float *d_c55, float *d_c66, float *d_txx, float *d_tyy, float *d_tzz, float *d_txy, float *d_tyz, float *d_tzx, float *vp, float *vs){
+__global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior, float dt, float *d_c11, float *d_c12, float *d_c13, float *d_c22, float *d_c23, float *d_c33, float *d_c44, float *d_c55, float *d_c66, float *d_txx, float *d_tyy, float *d_tzz, float *d_txy, float *d_tyz, float *d_tzx, float *d_vp, float *d_vs, float qp, float qs){
 
 
   int x = threadIdx.x + blockIdx.x * blockDim.x;
@@ -427,35 +427,45 @@ __global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior,
     float c22 = d_c22[cAddr];
     float c23 = d_c23[cAddr];
     float c33 = d_c33[cAddr];
+    float vp  = d_vp[cAddr];
+    float vs  = d_vs[cAddr];
 
     float txx = d_txx[tAddr];
     float tyy = d_tyy[tAddr];
     float tzz = d_tzz[tAddr];
 
-    float qp = 50;
-    float qs = 50;
-    float gamma_p = 1.0/SF_PI*atan(2*SF_PI/qp);
-    float gamma_s = 1.0/SF_PI*atan(2*SF_PI/qs);
-    float tau_p = c11 * powf(c11,2*gamma_p-1) * sin(SF_PI * gamma_p) / dt;
-    float tau_s = (c13-c11)/2 * powf(c11,2*gamma_s-1) * sin(SF_PI * gamma_p) / dt;
+    float qp = 1;
+    float qs = 1;
+    float gamma_p = 1.0/SF_PI*atan(1/qp);
+    float gamma_s = 1.0/SF_PI*atan(1/qs);
+    float tau_11 = c11*powf(vp,2*gamma_p-1) * sin(SF_PI * gamma_p) / dt;
+    float tau_22 = (c11-c12)/2 * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;
+    float tau_33 = (c11-c13)/2 * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;
+    d_txx[tAddr] = (tau_11 + c11)              * txx +
+                   (tau_11 - 2 * tau_22 + c12) * tyy +
+                   (tau_11 - 2 * tau_33 + c13) * tzz;
+    d_tzx[tAddr] = (tau_33 + d_c55[cAddr]) * d_tzx[tAddr];
 
+    /////////////////////////////
 
-    d_txx[tAddr] = c11 * txx
-      + c12 * tyy
-      + c13 * tzz;
+    tau_11 = (c22-c12)/2 * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;
+    tau_22 = c22*powf(vp,2*gamma_p-1) * sin(SF_PI * gamma_p) / dt;
+    tau_33 = (c22-c23)/2 * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;
+    d_tyy[tAddr] = (tau_22 - 2 * tau_11 + c12) * txx +
+                   (tau_22 + c22)              * tyy +
+                   (tau_22 - 2 * tau_33 + c23) * tzz;
+    d_tyz[tAddr] = (tau_33 + d_c44[cAddr]) * d_tyz[tAddr];
 
-    d_tyy[tAddr] = c12 * txx
-      + c22 * tyy
-      + c23 * tzz;
+    /////////////////////////////
+    tau_11 = (c33-c13)/2 * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;
+    tau_22 = (c33-c23)/2 * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;
+    tau_33 = c33*powf(vp,2*gamma_p-1) * sin(SF_PI * gamma_p) / dt;
 
-    d_tzz[tAddr] = c13 * txx
-      + c23 * tyy
-      + c33 * tzz;
+    d_tzz[tAddr] = (tau_33 - 2 * tau_11 + c13) * txx + 
+                   (tau_33 - 2 * tau_22 + c23) * tyy + 
+                   (tau_33 + c33)              * tzz;
 
-    // store stresses in output arrays
-    d_tyz[tAddr] = d_c44[cAddr] * d_tyz[tAddr];
-    d_tzx[tAddr] = d_c55[cAddr] * d_tzx[tAddr];
-    d_txy[tAddr] = d_c66[cAddr] * d_txy[tAddr];
+    d_txy[tAddr] = (tau_22 + d_c66[cAddr]) * d_txy[tAddr];
 
   }
 
