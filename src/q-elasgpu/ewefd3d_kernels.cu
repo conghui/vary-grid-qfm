@@ -1,3 +1,8 @@
+#include <math.h>
+extern "C" {
+#include <rsf.h>
+}
+
 /* GPU Kernel Functions used in sfewefd3d_gpu_p2p and sfewefd3d_gpu_mpi */
 
 /*
@@ -378,20 +383,78 @@ __global__ void strainToStress(int gpuID, int nxpad, int nzpad, int nyinterior, 
     float tzz = d_tzz[tAddr];
 
     d_txx[tAddr] = d_c11[cAddr] * txx
-             + c12 * tyy
-             + c13 * tzz;
+      + c12 * tyy
+      + c13 * tzz;
 
-      d_tyy[tAddr] = c12 * txx
-           + c22 * tyy
-             + c23 * tzz;
+    d_tyy[tAddr] = c12 * txx
+      + c22 * tyy
+      + c23 * tzz;
 
-      d_tzz[tAddr] = c13 * txx
-             + c23 * tyy
-           + d_c33[cAddr] * tzz;
+    d_tzz[tAddr] = c13 * txx
+      + c23 * tyy
+      + d_c33[cAddr] * tzz;
 
     // store stresses in output arrays
-      d_tyz[tAddr] = d_c44[cAddr] * d_tyz[tAddr];
-      d_tzx[tAddr] = d_c55[cAddr] * d_tzx[tAddr];
+    d_tyz[tAddr] = d_c44[cAddr] * d_tyz[tAddr];
+    d_tzx[tAddr] = d_c55[cAddr] * d_tzx[tAddr];
+    d_txy[tAddr] = d_c66[cAddr] * d_txy[tAddr];
+
+  }
+
+}
+
+__global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior, float dt, float *d_c11, float *d_c12, float *d_c13, float *d_c22, float *d_c23, float *d_c33, float *d_c44, float *d_c55, float *d_c66, float *d_txx, float *d_tyy, float *d_tzz, float *d_txy, float *d_tyz, float *d_tzx, float *vp, float *vs){
+
+
+  int x = threadIdx.x + blockIdx.x * blockDim.x;
+  int z = blockIdx.y;
+  int y = blockIdx.z;
+
+  if (x < nxpad){
+    int cAddr = y * nzpad * nxpad + z * nxpad + x;      // stiffness arrays do not have additional ghost cells
+    int tAddr;
+    if (gpuID == 0){
+      tAddr = y * nzpad * nxpad + z * nxpad + x;      // GPU 0 does not have any ghost cells in strain/stress arrays
+    }
+    else {
+      tAddr = (y+4) * nzpad * nxpad + z * nxpad + x;    // all other GPUs have ghost cells in strain/stress arrays
+    }
+
+    // these values are all re-used, store them in registers
+    float c11 = d_c11[cAddr];
+    float c12 = d_c12[cAddr];
+    float c13 = d_c13[cAddr];
+    float c22 = d_c22[cAddr];
+    float c23 = d_c23[cAddr];
+    float c33 = d_c33[cAddr];
+
+    float txx = d_txx[tAddr];
+    float tyy = d_tyy[tAddr];
+    float tzz = d_tzz[tAddr];
+
+    float qp = 50;
+    float qs = 50;
+    float gamma_p = 1.0/SF_PI*atan(2*SF_PI/qp);
+    float gamma_s = 1.0/SF_PI*atan(2*SF_PI/qs);
+    float tau_p = c11 * powf(c11,2*gamma_p-1) * sin(SF_PI * gamma_p) / dt;
+    float tau_s = (c13-c11)/2 * powf(c11,2*gamma_s-1) * sin(SF_PI * gamma_p) / dt;
+
+
+    d_txx[tAddr] = c11 * txx
+      + c12 * tyy
+      + c13 * tzz;
+
+    d_tyy[tAddr] = c12 * txx
+      + c22 * tyy
+      + c23 * tzz;
+
+    d_tzz[tAddr] = c13 * txx
+      + c23 * tyy
+      + c33 * tzz;
+
+    // store stresses in output arrays
+    d_tyz[tAddr] = d_c44[cAddr] * d_tyz[tAddr];
+    d_tzx[tAddr] = d_c55[cAddr] * d_tzx[tAddr];
     d_txy[tAddr] = d_c66[cAddr] * d_txy[tAddr];
 
   }

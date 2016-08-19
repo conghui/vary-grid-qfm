@@ -23,7 +23,7 @@ bool checksame(const fdm3d &a, const fdm3d &b) {
 }
 
 
-static void interp_host_den_vel_patch_n(const fdm3d &oldfdm, const fdm3d &newfdm, const fdm3d &fullfdm, const float *sinc_table, int ntab, int lsinc, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
+static void interp_host_den_vel_patch_n(const fdm3d &oldfdm, const fdm3d &newfdm, const fdm3d &fullfdm, const float *sinc_table, int ntab, int lsinc, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***full_h_vp, float ***full_h_vs, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23, float ***&h_vp, float ***&h_vs)
 {
   if (checksame(oldfdm, newfdm)) {
     sf_warning("old and new dimensions for den/vel are the same, don't need interpolatin");
@@ -43,10 +43,12 @@ static void interp_host_den_vel_patch_n(const fdm3d &oldfdm, const fdm3d &newfdm
   free(**h_c12); free(*h_c12); free(h_c12); h_c12 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
   free(**h_c13); free(*h_c13); free(h_c13); h_c13 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
   free(**h_c23); free(*h_c23); free(h_c23); h_c23 = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_vp); free(*h_vp); free(h_vp); h_vp = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
+  free(**h_vs); free(*h_vs); free(h_vs); h_vs = sf_floatalloc3(newfdm->nzpad, newfdm->nxpad, newfdm->nypad);
 
-  int narray = 10;
-  float *input[] = {full_h_ro[0][0], full_h_c11[0][0], full_h_c22[0][0], full_h_c33[0][0], full_h_c44[0][0], full_h_c55[0][0], full_h_c66[0][0], full_h_c12[0][0], full_h_c13[0][0], full_h_c23[0][0]};
-  float *output[] = {h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0]};
+  int narray = 12;
+  float *input[] = {full_h_ro[0][0], full_h_c11[0][0], full_h_c22[0][0], full_h_c33[0][0], full_h_c44[0][0], full_h_c55[0][0], full_h_c66[0][0], full_h_c12[0][0], full_h_c13[0][0], full_h_c23[0][0], full_h_vp[0][0], full_h_vs[0][0]};
+  float *output[] = {h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_vp[0][0], h_vs[0][0]};
 
   sinc_interp3d_n(narray, input, output, sinc_table, ntab, lsinc,
     fullfdm->nzpad, fullfdm->oz, fullfdm->dz,
@@ -133,7 +135,7 @@ static void gather_from_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h
   }
 }
 
-static void init_host_den_vel(const fdm3d &fdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
+static void init_host_den_vel(const fdm3d &fdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***full_h_vp, float ***full_h_vs, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23, float ***&h_vp, float ***h_vs)
 {
   int bytes = fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float);
   h_ro  = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_ro [0][0], full_h_ro [0][0], bytes);
@@ -146,6 +148,8 @@ static void init_host_den_vel(const fdm3d &fdm, float ***full_h_ro, float ***ful
   h_c12 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c12[0][0], full_h_c12[0][0], bytes);
   h_c13 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c13[0][0], full_h_c13[0][0], bytes);
   h_c23 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c23[0][0], full_h_c23[0][0], bytes);
+  h_vp = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);   memcpy(h_vp[0][0], full_h_vp[0][0], bytes);
+  h_vs = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);   memcpy(h_vs[0][0], full_h_vs[0][0], bytes);
 }
 
 static void release_host_den_vel(float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
@@ -165,6 +169,11 @@ static void release_host_den_vel(float ***&h_ro, float ***&h_c11, float ***&h_c2
 
 static void interp_host_umo_patch_n(const fdm3d &oldfdm, const fdm3d &newfdm, const float *sinc_table, int ntab, int lsinc, float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
 {
+  if (checksame(oldfdm, newfdm)) {
+    sf_warning("old and new dimensions for wavefields are the same, don't need interpolatin");
+    return;
+  }
+
   struct timeval start, stop;
   gettimeofday(&start, NULL);
 
@@ -207,7 +216,7 @@ static fdm3d clonefdm(const fdm3d &fdm)
   return fdutil3d_init(fdm->verb,fdm->free,az,ax,ay,fdm->nb,fdm->ompchunk);
 }
 
-static void init_host_umo(const fdm3d &fdm, float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
+static void init_host_umo(const fdm3d &fdm, float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz, float ***&h_vp, float ***&h_vs)
 {
   int n1 = fdm->nzpad; int n2 = fdm->nxpad; int n3 = fdm->nypad;
   int bytes = n1 * n2 * n3 * sizeof(float);
@@ -218,6 +227,8 @@ static void init_host_umo(const fdm3d &fdm, float ***&h_umx, float ***&h_uox,  f
   h_uoz = sf_floatalloc3(n1, n2, n3); memset(h_uoz[0][0], 0, bytes);
   h_uox = sf_floatalloc3(n1, n2, n3); memset(h_uox[0][0], 0, bytes);
   h_uoy = sf_floatalloc3(n1, n2, n3); memset(h_uoy[0][0], 0, bytes);
+  h_vp = sf_floatalloc3(n1, n2, n3); memset(h_uoy[0][0], 0, bytes);
+  h_vs = sf_floatalloc3(n1, n2, n3); memset(h_uoy[0][0], 0, bytes);
 }
 
 static void release_host_umo(float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
@@ -534,7 +545,7 @@ static void read_density_velocity(sf_file &Fden, sf_file &Fccc, const fdm3d &fdm
   free(**tt1); free(*tt1); free(tt1);
 }
 
-static void copy_den_vel_to_dev(const fdm3d &fdm, float **&d_ro , float **&d_c11, float **&d_c22, float **&d_c33, float **&d_c44, float **&d_c55, float **&d_c66, float **&d_c12, float **&d_c13, float **&d_c23, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, int nyinterior, int ngpu)
+static void copy_den_vel_to_dev(const fdm3d &fdm, float **&d_ro , float **&d_c11, float **&d_c22, float **&d_c33, float **&d_c44, float **&d_c55, float **&d_c66, float **&d_c12, float **&d_c13, float **&d_c23, float **&d_vp, float **&d_vs, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, const float *h_vp, const float *h_vs, int nyinterior, int ngpu)
 {
   d_ro = (float**)malloc(ngpu*sizeof(float*));
   d_c11 = (float**)malloc(ngpu*sizeof(float*));
@@ -546,6 +557,8 @@ static void copy_den_vel_to_dev(const fdm3d &fdm, float **&d_ro , float **&d_c11
   d_c12 = (float**)malloc(ngpu*sizeof(float*));
   d_c13 = (float**)malloc(ngpu*sizeof(float*));
   d_c23 = (float**)malloc(ngpu*sizeof(float*));
+  d_vp = (float**)malloc(ngpu*sizeof(float*));
+  d_vs = (float**)malloc(ngpu*sizeof(float*));
 
   // allocate density and stiffness sub-domain arrays on each GPU and copy the data
   for (int g = 0; g < ngpu; g++){
@@ -560,6 +573,8 @@ static void copy_den_vel_to_dev(const fdm3d &fdm, float **&d_ro , float **&d_c11
     cudaMalloc(&d_c12[g], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
     cudaMalloc(&d_c13[g], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
     cudaMalloc(&d_c23[g], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
+    cudaMalloc(&d_vp[g], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
+    cudaMalloc(&d_vs[g], nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float));
     sf_check_gpu_error("cudaMalloc density and stiffness to device");
 
     cudaMemcpy(d_ro[g] , h_ro  + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
@@ -572,6 +587,8 @@ static void copy_den_vel_to_dev(const fdm3d &fdm, float **&d_ro , float **&d_c11
     cudaMemcpy(d_c12[g], h_c12 + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
     cudaMemcpy(d_c13[g], h_c13 + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
     cudaMemcpy(d_c23[g], h_c23 + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_vp[g], h_vp + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_vs[g], h_vs + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
     sf_check_gpu_error("copy density and stiffness to device");
 
   }
@@ -780,7 +797,7 @@ static void precompute(const fdm3d &fdm, float **&d_ro, float dt, int nyinterior
   sf_check_gpu_error("computeRo Kernel");
 }
 
-static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, float **d_umx, float **d_uox, float **d_upx, float **d_uax, float **d_utx, float **d_umy, float **d_uoy, float **d_upy, float **d_uay, float **d_uty, float **d_umz, float **d_uoz, float **d_upz, float **d_uaz, float **d_utz, float **d_tzz, float **d_txx, float **d_tyy, float **d_txy, float **d_tyz, float **d_tzx, float **d_c11, float **d_c22, float **d_c33, float **d_c44, float **d_c55, float **d_c66, float **d_c12, float **d_c13, float **d_c23, float **d_Sw000, float **d_Sw001, float **d_Sw010, float **d_Sw011, float **d_Sw100, float **d_Sw101, float **d_Sw110, float **d_Sw111, int **d_Sjz, int **d_Sjx, int **d_Sjy, float **d_Rw000, float **d_Rw001, float **d_Rw010, float **d_Rw011, float **d_Rw100, float **d_Rw101, float **d_Rw110, float **d_Rw111, int **d_Rjz, int **d_Rjx, int **d_Rjy, float **d_bell, float **d_ww, float **d_ro, float **d_bzl_s, float **d_bzh_s, float **d_bxl_s, float **d_bxh_s, float **d_byl_s, float **d_byh_s, float *** uoz, float *** uox, float *** uoy, float *h_uz, float *h_ux, float *h_uy, float ***uc, float *h_dd, float *h_dd_combined, float **d_dd, sf_axis az, sf_axis ax, sf_axis ay, const int *nylocal, float spo, float idx, float idy, float idz, int nt, int jsnap, int jdata, int ngpu, int nyinterior, int ns, int nr, int nbell, int nc, bool interp, bool snap, bool fsrf, bool ssou, bool dabc, bool verb, int &total_iter)
+static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, float dt, float **d_umx, float **d_uox, float **d_upx, float **d_uax, float **d_utx, float **d_umy, float **d_uoy, float **d_upy, float **d_uay, float **d_uty, float **d_umz, float **d_uoz, float **d_upz, float **d_uaz, float **d_utz, float **d_tzz, float **d_txx, float **d_tyy, float **d_txy, float **d_tyz, float **d_tzx, float **d_c11, float **d_c22, float **d_c33, float **d_c44, float **d_c55, float **d_c66, float **d_c12, float **d_c13, float **d_c23, float **d_vp, float **d_vs, float **d_Sw000, float **d_Sw001, float **d_Sw010, float **d_Sw011, float **d_Sw100, float **d_Sw101, float **d_Sw110, float **d_Sw111, int **d_Sjz, int **d_Sjx, int **d_Sjy, float **d_Rw000, float **d_Rw001, float **d_Rw010, float **d_Rw011, float **d_Rw100, float **d_Rw101, float **d_Rw110, float **d_Rw111, int **d_Rjz, int **d_Rjx, int **d_Rjy, float **d_bell, float **d_ww, float **d_ro, float **d_bzl_s, float **d_bzh_s, float **d_bxl_s, float **d_bxh_s, float **d_byl_s, float **d_byh_s, float *** uoz, float *** uox, float *** uoy, float *h_uz, float *h_ux, float *h_uy, float ***uc, float *h_dd, float *h_dd_combined, float **d_dd, sf_axis az, sf_axis ax, sf_axis ay, const int *nylocal, float spo, float idx, float idy, float idz, int nt, int jsnap, int jdata, int ngpu, int nyinterior, int ns, int nr, int nbell, int nc, bool interp, bool snap, bool fsrf, bool ssou, bool dabc, bool verb, int &total_iter)
 {
   int nb = fdm->nb;
   int nx = fdm->nx;
@@ -814,7 +831,7 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, float **d_um
       cudaSetDevice(g);
       dim3 dimGrid3(ceil(fdm->nxpad/192.0f), fdm->nzpad, nyinterior);
       dim3 dimBlock3(192,1,1);
-      strainToStress<<<dimGrid3, dimBlock3>>>(g, fdm->nxpad, fdm->nzpad, nyinterior, d_c11[g], d_c12[g], d_c13[g], d_c22[g], d_c23[g], d_c33[g], d_c44[g], d_c55[g], d_c66[g], d_txx[g], d_tyy[g], d_tzz[g], d_txy[g], d_tyz[g], d_tzx[g]);
+      strainToStressQ<<<dimGrid3, dimBlock3>>>(g, fdm->nxpad, fdm->nzpad, nyinterior, dt, d_c11[g], d_c12[g], d_c13[g], d_c22[g], d_c23[g], d_c33[g], d_c44[g], d_c55[g], d_c66[g], d_txx[g], d_tyy[g], d_tzz[g], d_txy[g], d_tyz[g], d_tzx[g], d_vp[g], d_vs[g]);
     }
     sf_check_gpu_error("strainToStress Kernel");
 
@@ -1211,7 +1228,7 @@ static void make_axis(const fdm3d &fullfdm, modeling_t *m, int ngpu, sf_axis &az
  *
  * It also output the wavefield and data
  */
-static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, const float *h_ww, int ns, int nr, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb, int &total_iter)
+static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, const float *h_vp, const float *h_vs, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, const float *h_ww, int ns, int nr, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb, int &total_iter)
 {
 
   /*------------------------------------------------------------*/
@@ -1254,10 +1271,9 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *r
   setup_interp_cooef_receiver(d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, fdm, rr, nr, ngpu);
 
   setup_fd_cooef(fdm, idz, idx, idy);
-  float **d_ro ,  **d_c11,  **d_c22,  **d_c33,  **d_c44,  **d_c55,  **d_c66,  **d_c12,  **d_c13,  **d_c23;
-  // TODO: we need interpolation here for h_ro, h_c11 ... h_c23
+  float **d_ro ,  **d_c11,  **d_c22,  **d_c33,  **d_c44,  **d_c55,  **d_c66,  **d_c12,  **d_c13,  **d_c23, **d_vp, **d_vs;
   // TODO: rename h_ro and other similar to full_h_ro
-  copy_den_vel_to_dev(fdm, d_ro , d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, nyinterior, ngpu);
+  copy_den_vel_to_dev(fdm, d_ro , d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, d_vp, d_vs, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, h_vp, h_vs, nyinterior, ngpu);
 
   float spo = 0;
   float **d_bzl_s,  **d_bzh_s,  **d_bxl_s,  **d_bxh_s,  **d_byl_s,  **d_byh_s;
@@ -1274,7 +1290,7 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *r
    *  MAIN LOOP
    */
   /*------------------------------------------------------------*/
-  main_loop(Fwfl, Fdat, fdm, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, d_bell, d_ww, d_ro, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s,  uz,  ux,  uy, h_uz, h_ux, h_uy, uc, h_dd, h_dd_combined, d_dd, az, ax, ay, nylocal, spo, idx, idy, idz, nt, jsnap, jdata, ngpu, nyinterior, ns, nr, nbell, nc, interp, snap, fsrf, ssou, dabc, verb, total_iter);
+  main_loop(Fwfl, Fdat, fdm, dt, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, d_vp, d_vs, d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, d_bell, d_ww, d_ro, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s,  uz,  ux,  uy, h_uz, h_ux, h_uy, uc, h_dd, h_dd_combined, d_dd, az, ax, ay, nylocal, spo, idx, idy, idz, nt, jsnap, jdata, ngpu, nyinterior, ns, nr, nbell, nc, interp, snap, fsrf, ssou, dabc, verb, total_iter);
 
   gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_umx, d_umy, d_umz, h_umx, h_umy, h_umz, nyinterior, ngpu);
   gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, h_uox, h_uoy, h_uoz, nyinterior, ngpu);
@@ -1312,6 +1328,8 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *r
     cudaFree(d_c12[g]);
     cudaFree(d_c13[g]);
     cudaFree(d_c23[g]);
+    cudaFree(d_vp[g]);
+    cudaFree(d_vs[g]);
 
     if (dabc){
       cudaFree(d_bzl_s[g]);
@@ -1501,10 +1519,17 @@ int main(int argc, char* argv[]) {
 
 
   sf_file Fvelp = sf_input("vp"); // p wave velocity
-  float ***v0 = sf_floatalloc3(nz, nx, ny);
+  sf_file Fvels = sf_input("vs"); // s wave velocity
+  float ***vp = sf_floatalloc3(nz, nx, ny);
+  float ***vs = sf_floatalloc3(nz, nx, ny);
+  sf_floatread(vp[0][0], nx*ny*nz, Fvelp);
+  sf_floatread(vs[0][0], nx*ny*nz, Fvels);
+  float ***full_h_vp = sf_floatalloc3(fullfdm->nzpad, fullfdm->nxpad, fullfdm->nypad);
+  float ***full_h_vs = sf_floatalloc3(fullfdm->nzpad, fullfdm->nxpad, fullfdm->nypad);
+
   sf_seek(Fvelp, 0, SEEK_SET);
-  sf_floatread(v0[0][0], nx*ny*nz, Fvelp);
-  vel_t *vv0 = clone_vel(v0, nz, nx, ny, sf_o(az), sf_o(ax), sf_o(ay), sf_d(az), sf_d(ax), sf_d(ay), w0, qfact);
+  sf_seek(Fvels, 0, SEEK_SET);
+  vel_t *vv0 = clone_vel(vp, nz, nx, ny, sf_o(az), sf_o(ax), sf_o(ay), sf_d(az), sf_d(ax), sf_d(ay), w0, qfact);
   vmin_vmax_dmin_dmax(vv0, &vmin, &vmax, &dmin, &dmax);
 
   sf_warning("vmin: %f, vmax: %f, dmin: %f, dmax: %f", vmin, vmax, dmin, dmax);
@@ -1517,12 +1542,12 @@ int main(int argc, char* argv[]) {
   fdm3d oldfdm = clonefdm(fullfdm);
 
   // initialize host prev and current wavefield
-  float ***h_umx, ***h_uox,  ***h_umy,  ***h_uoy,  ***h_umz,  ***h_uoz;
-  init_host_umo(oldfdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
+  float ***h_umx, ***h_uox,  ***h_umy,  ***h_uoy,  ***h_umz,  ***h_uoz, ***h_vp, ***h_vs;
+  init_host_umo(oldfdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz, h_vp, h_vs);
 
   // initialize varying density and velocity
   float ***h_ro, ***h_c11, ***h_c22, ***h_c33, ***h_c44, ***h_c55, ***h_c66, ***h_c12, ***h_c13, ***h_c23;
-  init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+  init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, full_h_vp, full_h_vs, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, h_vp, h_vs);
 
   int total_iter = 0;
   sf_warning("init cuda device ...");
@@ -1561,12 +1586,12 @@ int main(int argc, char* argv[]) {
     if (snap)  set_output_wfd_time_block(Fwfl, at, curaz, curax, curay, ac, curnt, total_iter, curdt, jsnap, verb);
 
     sf_warning("iterpolating density and velocity");
-    interp_host_den_vel_patch_n(oldfdm, fdm, fullfdm, sinc_table, ntab, lsinc, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23);
+    interp_host_den_vel_patch_n(oldfdm, fdm, fullfdm, sinc_table, ntab, lsinc, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, full_h_vp, full_h_vs, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, h_vp, h_vs);
 
     sf_warning("iterpolating wavefields");
     interp_host_umo_patch_n(oldfdm, fdm, sinc_table, ntab, lsinc, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
 
-    run(Fwfl, Fdat, fdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, h_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
+    run(Fwfl, Fdat, fdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_vp[0][0], h_vs[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, h_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter);
 
     oldfdm = clonefdm(fdm);
   }
