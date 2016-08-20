@@ -1,4 +1,6 @@
 #!/bin/bash
+# vim: fdm=marker fdl=0
+# vim: ft=sh
 
 # Intel version 14
 if [[ -d /usr/local/intel_14 ]]; then
@@ -15,6 +17,8 @@ export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
 # SEPLIB
 export SEP=/data/bob/SEP
+
+# setup SEPLIB#{{{
 newPATH87=${SEP:?'required environment variable SEP missing'}/bin:${PATH}
 if [ ! -d ${SEP} ] ; then
   echo "${SEP} is not a directory. Exiting ..."
@@ -38,3 +42,4 @@ else
   export LANG
 fi
 unset newPATH87
+#}}}
