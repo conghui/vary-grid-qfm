@@ -1,6 +1,0 @@
-#---------------------------
-# SConstruct for building papers
-from rsf.tex import *
-
-End(resdir='Fig',use='color,array,amsmath,amssymb,amsfonts,algorithm,algorithmic,rplabels')
-#---------------------------

@@ -1,0 +1,23 @@
+#---------------------------
+# SConstruct for building papers
+from rsf.tex import *
+
+# End(resdir='Fig',use='color,array,amsmath,amssymb,amsfonts,algorithm,algorithmic,rplabels')
+
+import sys
+import os
+import SCons.Script
+
+def run(cmd):
+    """Run a command and decipher the return code. Exit by default."""
+    res = os.system(cmd)
+    # Assumes that if a process doesn't call exit, it was successful
+    if (os.WIFEXITED(res)):
+        code = os.WEXITSTATUS(res)
+        if code != 0:
+            print "Error: return code: " + str(code)
+            sys.exit(code)
+
+env = Environment(ENV = os.environ)
+env.Command('m.log', None, 'cd src/acoustic-3d-fortran; make')
+# os.system('make')

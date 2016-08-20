@@ -7,6 +7,7 @@ RESULTSER=qnoq spectra timeQ qtot follow timeTot sampleCompare single
 RESULTSCR=full
 
 
+default: main.x make_time.x
 main.x:   sinc_bob.o
 
 elf.shots.H: ../../data/elf.shots.H

@@ -1,21 +1,3 @@
-/* 3D elastic time-domain FD modeling */
-/*
-  Copyright (C) 2008 Colorado School of Mines
-
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
 #include <rsf.h>
 #ifdef _OPENMP
 #include <omp.h>
@@ -25,44 +7,6 @@
 
 #include <sys/time.h>
 #define NOP 4 /* derivative operator half-size */
-
-/* Muir's derivative operator */
-/*#define C1 +0.598144 */
-/*  1225/ 1024      /2 */
-/*#define C2 -0.039876 */
-/* -1225/(1024*  15)/2 */
-/*#define C3 +0.004785 */
-/*  1225/(1024* 125)/2 */
-/*#define C4 -0.000348 */
-/* -1225/(1024*1715)/2 */
-
-/*  forward FD derivative stencils */
-/*#define Fx(a,ix,iy,iz,s) (C4*(a[iy  ][ix+4][iz  ] - a[iy  ][ix-3][iz  ]) + \*/
-/*              C3*(a[iy  ][ix+3][iz  ] - a[iy  ][ix-2][iz  ]) + \*/
-/*              C2*(a[iy  ][ix+2][iz  ] - a[iy  ][ix-1][iz  ]) + \*/
-/*                          C1*(a[iy  ][ix+1][iz  ] - a[iy  ][ix  ][iz  ]) )*s*/
-/*#define Fy(a,ix,iy,iz,s) (C4*(a[iy+4][ix  ][iz  ] - a[iy-3][ix  ][iz  ]) + \*/
-/*              C3*(a[iy+3][ix  ][iz  ] - a[iy-2][ix  ][iz  ]) + \*/
-/*              C2*(a[iy+2][ix  ][iz  ] - a[iy-1][ix  ][iz  ]) + \*/
-/*                          C1*(a[iy+1][ix  ][iz  ] - a[iy  ][ix  ][iz  ]) )*s*/
-/*#define Fz(a,ix,iy,iz,s) (C4*(a[iy  ][ix  ][iz+4] - a[iy  ][ix  ][iz-3]) + \*/
-/*              C3*(a[iy  ][ix  ][iz+3] - a[iy  ][ix  ][iz-2]) + \*/
-/*              C2*(a[iy  ][ix  ][iz+2] - a[iy  ][ix  ][iz-1]) + \*/
-/*                          C1*(a[iy  ][ix  ][iz+1] - a[iy  ][ix  ][iz  ]) )*s*/
-
-/* backward FD derivative stencils */
-/*#define Bx(a,ix,iy,iz,s) (C4*(a[iy  ][ix+3][iz  ] - a[iy  ][ix-4][iz  ]) + \*/
-/*              C3*(a[iy  ][ix+2][iz  ] - a[iy  ][ix-3][iz  ]) + \*/
-/*              C2*(a[iy  ][ix+1][iz  ] - a[iy  ][ix-2][iz  ]) + \*/
-/*                          C1*(a[iy  ][ix  ][iz  ] - a[iy  ][ix-1][iz  ]) )*s*/
-/*#define By(a,ix,iy,iz,s) (C4*(a[iy+3][ix  ][iz  ] - a[iy-4][ix  ][iz  ]) + \*/
-/*              C3*(a[iy+2][ix  ][iz  ] - a[iy-3][ix  ][iz  ]) + \*/
-/*              C2*(a[iy+1][ix  ][iz  ] - a[iy-2][ix  ][iz  ]) + \*/
-/*                          C1*(a[iy  ][ix  ][iz  ] - a[iy-1][ix  ][iz  ]) )*s*/
-/*#define Bz(a,ix,iy,iz,s) (C4*(a[iy  ][ix  ][iz+3] - a[iy  ][ix  ][iz-4]) + \*/
-/*              C3*(a[iy  ][ix  ][iz+2] - a[iy  ][ix  ][iz-3]) + \*/
-/*              C2*(a[iy  ][ix  ][iz+1] - a[iy  ][ix  ][iz-2]) + \*/
-/*                          C1*(a[iy  ][ix  ][iz  ] - a[iy  ][ix  ][iz-1]) )*s*/
 
 /*------------------------------------------------------------*/
 /* CENTERED derivatives */
@@ -436,6 +380,8 @@ int main(int argc, char* argv[])
    */
   /*------------------------------------------------------------*/
   if(verb) fprintf(stderr,"\n");
+  float compute_elapse = 0;
+  float io_elapse = 0;
   for (it=0; it<nt; it++) {
     struct timeval start, stop;
     gettimeofday(&start, NULL);
@@ -632,6 +578,10 @@ int main(int argc, char* argv[])
       sponge3d_apply(uoy,spo,fdm);
     }
 
+    gettimeofday(&stop, NULL);
+    compute_elapse += stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec) * 1e-6;
+
+    gettimeofday(&start, NULL);
     /*------------------------------------------------------------*/
     /* cut wavefield and save */
     /*------------------------------------------------------------*/
@@ -696,12 +646,13 @@ int main(int argc, char* argv[])
       lint3d_extract(uoy,dd[2],cr);
       if(it%jdata==0) sf_floatwrite(dd[0],nr*nc,Fdat);
     }
-
     gettimeofday(&stop, NULL);
-    float elapse = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec) * 1e-6;
-    sf_warning("time elapse: %.2f", elapse);
+    io_elapse += stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec) * 1e-6;
+
   }
-  if(verb) fprintf(stderr,"\n");
+   sf_warning("\ntotal iter: %d, time elapsed for computation  (not including output wavefield/data): %.4fs", it, compute_elapse);
+   sf_warning("\ntotal iter: %d, time elapsed for input/output (not including main_loop computation): %.4fs", it, io_elapse);
+   if(verb) fprintf(stderr,"\n");
 
   /*------------------------------------------------------------*/
   /* deallocate arrays */

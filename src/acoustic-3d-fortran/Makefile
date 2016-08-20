@@ -10,10 +10,12 @@ UF90LIBS=-openmp  -lseptravel -lsepaux
 RESULTSER=qnoq spectra timeQ qtot follow timeTot sampleCompare single
 RESULTSCR=full
 
-default: single.H
+default: install
 
 main.x:   sinc_bob.o
 
+install: make_time.x
+	cp make_time.x ../../bin/maketime3d
 
 source.H: source.P
 	Wavelet par=source.P >$@

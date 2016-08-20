@@ -20,10 +20,11 @@ cuda_flags   = ['-O2']
 dirlist = [
    ('lib', 'lib'),
    ('bin', 'bin'),
-   ('q-elasgpu', 'src/q-elasgpu'),
-   ('elasgpu', 'src/elasgpu'),
-   ('elascpu', 'src/elascpu'),
+   ('elasgpu', 'src/elastic-3d-gpu'),
+   ('elascpu', 'src/elastic-3d-cpu'),
    ('acouscpu', 'src/acoustic-3d-c'),
+   ('acousfortran', 'src/acoustic-3d-fortran'),
+   ('acousfortran2d', 'src/acoustic-2d-fortran'),
 ]
 dirs = dict(dirlist)
 #}}}

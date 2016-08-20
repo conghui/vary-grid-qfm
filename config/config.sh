@@ -7,6 +7,7 @@ fi
 
 # madagascar
 export DATAPATH=${HOME}/.rsfdata/
+mkdir -p $DATAPATH
 export PYTHONPATH=$PYTHONPATH:$RSFSRC/build/book/Recipes
 
 # cuda

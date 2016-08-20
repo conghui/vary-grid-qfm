@@ -1,0 +1,14 @@
+#---------------------------
+# SConstruct for building papers
+from rsf.tex import *
+
+# End(resdir='Fig',use='color,array,amsmath,amssymb,amsfonts,algorithm,algorithmic,rplabels')
+
+import sys
+import os
+
+env = Environment(ENV = os.environ)
+
+env.Command('m.log', None, 'cd src/acoustic-2d-fortran; make')
+
+#---------------------------

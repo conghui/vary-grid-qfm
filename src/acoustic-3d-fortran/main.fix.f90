@@ -1,3 +1,7 @@
+# 1 "<stdin>"
+# 1 "<built-in>"
+# 1 "<command-line>"
+# 1 "<stdin>"
 program RTM_FAST
   use my_timers_mod
   use vel_mod
@@ -11,12 +15,14 @@ program RTM_FAST
   type(velT) :: vel
   type(timesT) :: times
   type(sourceT) :: source
-  type(dataT)   :: dat
+  type(dataT) :: dat
   type(modelingT) :: full
   integer :: ishot,ii
   real :: factor,rnd
   integer, allocatable :: shot(:, :, :) ! first dimension store the real index
   logical, allocatable :: shotL(:, :)
+
+  sdfdf
 
   call initpar()
   call setup_timers()
@@ -60,7 +66,7 @@ program RTM_FAST
     do ixshot = 1, dat%n4
       factor= migrate_shot(shot(:, ixshot, iyshot),verb,vel,dat,source,times)
       write(0,*) ixshot, " MIGRATING SHOT", shot(1, ixshot, iyshot), " of ",dat%n4, " sped up ",factor
-      !if(mod(ishot,5)==0)  call writeFullImage("img")
+      !if(mod(ishot,5)==0) call writeFullImage("img")
     end do
   end do
   call print_timers()

@@ -1,0 +1,183 @@
+# . . Set up generic project files
+from rsf.proj import *
+import fdmod,encode,wemig,stiffness,os
+
+# . . Set parameter for the modelling.  Applies for all situations.
+par = {
+    # Space parameters
+    # 616
+    'nz':112,  'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
+    'nx':112,  'ox':0, 'dx':10,  'lx':'x', 'ux':'m',
+    'ny':88,  'oy':0, 'dy':10,  'ly':'y', 'uy':'m',
+
+    # receiver locations
+    'rnz':1,   'roz':0, 'rdz':10,
+    'rnx':40,  'rox':0, 'rdx':10,
+    'rny':2,   'roy':0, 'rdy':10,
+
+    # Time Parameters
+    'nt':400,'ot':0, 'dt':0.002,  'lt':'t', 'ut':'s',
+    'kt':100,'frq':10,
+
+    # Modelling parameters
+    'jsnap':100, 'nb':44, 'verb':'y',
+    'nbell':5,  'jdata':8,'ssou':'y',
+
+    # Output
+    'height':5,
+
+    'qp': 0, 'qs': 0, # buggy, only support 0
+    'ngpu':2, 'timeblocks':1
+    }
+
+# . . Initialize parameters in fdm module
+fdmod.param(par)
+par['nframe']=10
+par['iframe']=4
+par['dabc']='y'
+
+# set the source location
+par['sz'] = 0
+par['sx'] = par['nx'] * par['dx'] / 2
+par['sy'] = par['ny'] * par['dy'] / 2
+
+# . . Thomsen parameters
+par['vp']=2000
+par['vs']=1154.7
+par['ro']=2000
+par['eps1']=+0.200
+par['eps2']=+0.300
+par['del1']=-0.100
+par['del2']=-0.050
+par['del3']=-0.075
+par['gam1']=+0.200
+par['gam2']=+0.500
+
+# --------------------------------------------------------------------
+# . . Source Section
+#
+# . . Wavelet
+fdmod.wavelet('wav_',par['frq'],par)
+
+# . . 3D Elastic source
+Flow('souz','wav_','math output=input*1')
+Flow('soux','wav_','math output=input*1')
+Flow('souy','wav_','math output=input*1')
+
+Flow('wave-3d',['souz','soux','souy'],
+     '''
+     cat axis=2 space=n ${SOURCES[1:3]} |
+     transp plane=12 |
+     transp plane=23 |
+     transp plane=12
+     ''')
+#fdmod.ewavelet3d('wave-3d','',par)
+
+# --------------------------------------------------------------------
+# . . Coordinate Section
+# . . Locate source position
+xsou=par['sx']+(par['nx']-1)*par['dx']/2.
+ysou=par['oy']+(par['ny']-1)*par['dy']/2.
+zsou=par['oz']
+
+# . . 3D Sources
+Flow('ss-3d', None,
+    '''spike nsp=3 mag=%(sx)g,%(sy)g,%(sz)g n1=3 k1=1,2,3
+    n1=3 label1="(x,y,z)" unit=
+    n2=1 label2="Z" unit=
+    n3=1 label3="X" unit=
+    n4=1 label4="Y"''' % par)
+
+# # . . 3D receivers
+Flow('r_', None,
+    '''math output=0
+    n1=%(rnz)d o1=%(roz)g d1=%(rdz)g label=%(lz)s unit=%(uz)s
+    n2=%(rnx)d o2=%(rox)g d2=%(rdx)g label=%(lx)s unit=%(ux)s
+    n3=%(rny)d o3=%(roy)g d3=%(rdy)g label=%(ly)s unit=%(uy)s
+    ''' % par)
+
+Flow('r_z', 'r_', 'math output=x1')
+Flow('r_x', 'r_', 'math output=x2')
+Flow('r_y', 'r_', 'math output=x3')
+Flow('rr-3d', ['r_x', 'r_y', 'r_z'],
+    ''' cat axis=4 space=n ${SOURCES[1]} ${SOURCES[2]} |
+    transp plane=14 | transp plane=24 | transp plane=34 |
+    put label1="(x,y,z)" label2="Z" label3="X" label4="Y"
+    ''')
+
+# . . Create a 3D point location for plotting
+par['zlook'] = 0.2
+par['nzcut'] = par['nz']/2
+center=fdmod.center3d(xsou,ysou,par['zlook'],par)
+print center
+
+# --------------------------------------------------------------------
+# . . Create zero array size of 3D model
+Flow('zero-3d',None,
+     '''
+     spike nsp=1 mag=0.0
+     n1=%(nz)d o1=%(oz)g d1=%(dz)g
+     n2=%(nx)d o2=%(ox)g d2=%(dx)g
+     n3=%(ny)d o3=%(oy)g d3=%(dy)g |
+     put label1=%(lz)s label2=%(lx)s label3=%(ly)s unit1=%(uz)s unit2=%(ux)s unit3=%(uy)s
+     ''' % par)
+
+# . . Generate 3D models of anisotropy
+Flow('vp-3d','zero-3d','math output="%(vp)g"' %par)
+Flow('vs-3d','zero-3d','math output="%(vs)g"' %par)
+Flow('ro-3d','zero-3d','math output="%(ro)g"' %par)
+Flow('eps1-3d','zero-3d','math output="%(eps1)g"' %par)
+Flow('del1-3d','zero-3d','math output="%(del1)g"' %par)
+Flow('gam1-3d','zero-3d','math output="%(gam1)g"' %par)
+
+# . . Make 3D stiffness matricies
+Flow('zerostiff','vp-3d','math output="input*0" ')
+stiffness.vti3d('VTIc-3d','vp-3d','vs-3d','ro-3d','eps1-3d','del1-3d','gam1-3d',par)
+
+sindex=range(0,9,1)
+Flow('null',None,'spike n1=16 n2=16 nsp=1 mag=0')
+
+# . . Make different stiffness tensors
+for m in ['VTI']:
+  for isou in sindex:
+    stag="%01d"%isou
+    Flow(m+'p1'+stag,m+'c-3d','window n1=1 n2=1 n3=1 n4=1 f4=%d '%isou)
+    Flow(m+'p2'+stag,[m+'p1'+stag,  m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag,m+'p1'+stag], 'cat ${SOURCES[1:16]} axis=1')
+    Flow(m+'c'+stag,[m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag,m+'p2'+stag],'cat ${SOURCES[1:16]} axis=2')
+  Flow(m+'x1',[m+'c0',m+'c6',m+'c7','null','null','null'],'cat axis=2 ${SOURCES[1:6]} ')
+  Flow(m+'x2',[m+'c6',m+'c1',m+'c8','null','null','null'],'cat axis=2 ${SOURCES[1:6]} ')
+  Flow(m+'x3',[m+'c7',m+'c8',m+'c2','null','null','null'],'cat axis=2 ${SOURCES[1:6]} ')
+  Flow(m+'x4',['null','null','null',m+'c3','null','null'],'cat axis=2 ${SOURCES[1:6]} ')
+  Flow(m+'x5',['null','null','null','null',m+'c4','null'],'cat axis=2 ${SOURCES[1:6]} ')
+  Flow(m+'x6',['null','null','null','null','null',m+'c5'],'cat axis=2 ${SOURCES[1:6]} ')
+  Flow(m+'c',[m+'x1',m+'x2',m+'x3',m+'x4',m+'x5',m+'x6'],'cat axis=1 ${SOURCES[1:6]} ')
+  Result(m+'c','grey pclip=100 title="" wantaxis=n screenratio=1 allpos=y color=j')
+
+
+# ------------------------------------------------------------
+# make time
+Flow('times', 'vp-3d', 'window j1=8 j2=8 j3=8 | ../../src/acoustic-3d-fortran/make_time.x j2=4 j3=4')
+
+
+# ------------------------------------------------------------
+# . . Elastic Modeling Section
+# . . Perform 3D modelling
+for exe in ['gpu', 'cpu']:
+    Flow(['VTId-3d-' + exe,'VTIw-3d-' + exe], ['wave-3d','VTIc-3d','ro-3d','ss-3d','rr-3d', 'vp-3d', 'times', 'vs-3d'],
+        '../../bin/elas3d' + exe +
+        '''
+        ccc=${SOURCES[1]}
+        den=${SOURCES[2]}
+        sou=${SOURCES[3]}
+        rec=${SOURCES[4]}
+        wfl=${TARGETS[1]}
+        vp=${SOURCES[5]}
+        times=${SOURCES[6]}
+        vs=${SOURCES[7]}
+        ngpu=%(ngpu)d jdata=%(jdata)d verb=%(verb)s free=n ssou=%(ssou)s
+        opot=n snap=%(snap)s jsnap=%(jsnap)d timeblocks=%(timeblocks)d
+        dabc=%(dabc)s nb=%(nb)d nbell=%(nbell)d qp=%(qp)f qs=%(qs)f
+        ''' %par)
+
+    print '\n\n'
+End()

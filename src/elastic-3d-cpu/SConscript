@@ -2,7 +2,7 @@ import os
 Import('*')
 
 cuda_bin_list = [
-    ("efd3d", "Mewefd3d.c"),
+    ("elas3dcpu", "main-efd3d.c"),
 ]
 
 cuda_module = """

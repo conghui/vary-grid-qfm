@@ -2,8 +2,7 @@ import os
 Import('*')
 
 cuda_bin_list = [
-    ("elastic", "Mewefd3d_gpu_p2p.cu"),
-    ("maketime", "main-maketime.c"),
+    ("elas3dgpu", "main-efd3d.cu"),
     ("interp", "sin2.c"),
 ]
 
