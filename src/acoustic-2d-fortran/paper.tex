@@ -1,0 +1,258 @@
+\title{Approximating Q propagation to speed up finite differences}
+\author{Robert G. Clapp}
+\righthead{Approximate Q}
+\lefthead{Clapp}
+\footer{SEP--158}
+\maketitle
+
+
+
+
+
+
+
+
+\begin{abstract}
+
+
+%Motivation
+
+Propagating wave-fields using explicit finite difference is the kernel for Reverse Time Migration (RTM) and high end velocity analysis
+algorithms.
+To avoid grid dispersion artifacts,  the cost of propagation is proportional to the frequency of the energy being propagated raised
+to the fourth power.
+Attenuation in the earth tends to decrease usable frequencies as a function of time.
+By using an approximation to the wave equation for attenuated media, to save computation, we can approximate the earth's behavior.
+As a result we can use coarser sampling at large time. Combined
+with limiting  grid propagation to around the source at early times we can achieve large speedups in modeling, migration, and potentially
+velocity analysis.
+\end{abstract}
+
+%Approach
+%Results
+%Conslussions
+
+\section{Introduction}
+Imaging and velocity analysis are the most computationally intensive parts
+of seismic processing. As a results researchers are always trying
+to find ways to speedup these processes \cite[]{bednar,Stork}.
+One approach used to speed up downward continuation based
+algorithms is to recognize that the earth attenuates seismic signals.
+As a result, as we push the wave-field down in depth, we can ignore
+higher and higher frequencies and still obtain an accurate image\cite[]{Clapp.sep.111.bob3}.
+This approach lowers the cost as you increase in depth. This technique is well
+suited for downward continuation based approaches which are done
+frequency by frequency.
+Reducing the frequencies downward
+continued as a function of depth  is particularly effective in combination with recognizing
+that there was no reason to propagate waves a large distance from
+the source at early times. 
+While following the wavefield is used routinely in RTM,  taking
+advantage of attenuation is not commonly used.  Reasons include:
+the cost of propagation with an attenuated wave equation, 
+attenuation is a function of medium parameter, and propagation 
+is generally done in the the time, rather frequency domain.
+\par
+In this paper I use a constant-Q approximation based on the work of \cite{zhu}.  As
+I propagate my source I resample my medium based on the maximum frequency that has not
+been significantly attenuated. Combining this approach with following the wave-field,
+I show that I can achieve significant computational speedups.
+
+
+
+
+
+
+\section{Modeling}
+
+Explicit finite difference modeling is constrained by figuring  out a sampling in time and space that results in stable propagation and does not create dispersive events.  For stability the Courant-Friedrichs-Lewy condition \cite[]{courant1967partial} must be met. 
+Stability is a function of limiting what percentage of a grid cell energy can move in one time step. Stability is therefore a function of the maximum velocity 
+$v_{max}$, the minimum spatial sampling 
+$d_{min}$, and the time step $dt$. For stability,
+\begin{equation}
+v_{max}\frac{dt}{d_{min}} < .5 \label{eq:stability}.
+\end{equation}
+The stability condition pushes one to use larger spatial sampling (faster, but less resolution) and/or finer time sampling (more expensive).  Dispersion, on the other hand, is a function of the minimum velocity $v_{min}$, the maximum frequency $f_{max}$, and the maximum spaital sampling $d_{max}$.   To avoid grid dispersion we need to  sample a given frequency with a minimum number of points.  There isn't a consensus on the minimum number
+of points. For the purpose of this paper I will require  3.2  points therefore,
+\begin{equation}
+\frac{v_{min} }{f_{max}d_{max}} > 3.2 \label{eq:dispersion}. 
+\end{equation}
+The dispersion constraint pushes us towards smaller (more expensive) spatial sampling, because of the stability constraint, and results in smaller the
+steps.
+Minimizing dispersion is the real reason for the expense of finite differences.  To avoid grid dispersion and achieve the same level of stability the number of operations increase by the fourth power (three due to space sampling and one for time).
+\par
+From observation we know that the earth attenuates acoustic signals.  Attenuation varies as a function of frequency and earth materials. The first approximation I am going to use is the concept of the constant
+Q model introduced by \cite{Kjartansson.sep.23}. 
+Q is defined as
+\begin{equation}
+Q=2 \pi \left( \frac{E}{\partial E}\right),
+\end{equation}
+where $\frac{E}{\partial E}$ is the fraction of energy lost per cycle. The larger the $Q$ value, the less energy loss per cycles.
+ The constant Q assumption assumes that energy dies out is a function of the number of wavelengths traveled through a medium. The higher the frequency, the faster the energy is attenuated.
+\subsection{Constant-Q Formulation}
+Building on this foundation \cite{zhu} used a fractional Laplacian approach to perform attenuated  propagation 
+in the time domain. Given a forcing function $f(t)$ and the wave-field $P(t)$ they proposed the equation,
+\begin{equation}
+\left[ \eta \bf L + \tau \bf H \frac{d}{dt} - v^{-2} \frac{\partial^2}{\partial t^2}\right] P(t)=f(t) \label{eq:zhu1},
+\end{equation}
+where 
+\begin{eqnarray}
+\bf L = \left(-\nabla^2\right)^{\gamma+1} \\
+\bf H = \left(-\nabla^2\right)^{\gamma+\frac{1}{2}}.
+\end{eqnarray}
+The constants in equation \ref{eq:zhu1} are defined as 
+\begin{equation}
+\eta=-v^{2\gamma}w_0^{-2\gamma} \cos \pi \gamma,
+\end{equation}
+
+\begin{equation}
+\tau=-v^{2\gamma-1}w_0^{-2\gamma} \sin \pi \gamma,
+\end{equation}
+and 
+\begin{equation}
+\gamma=\frac{1}{\tan^{-1}\frac{1}{Q}}.
+\end{equation}
+The first term in equation \ref{eq:zhu1} deals the dispersive effect of attenuation. The middle term
+deals damping.  For a constant Q approximation I can further simplify equation~\ref{eq:zhu1}, approximating
+$\nabla^2$ for $\bf H$. My resulting equation is then
+\begin{equation}
+\left[ \nabla^2 - \tau \nabla^2 \frac{d}{dt} - v^{-2} \frac{\partial^2}{\partial t^2}\right] P(t) =f(t) \label{eq:use}.
+\end{equation}
+\par
+Figure \ref{fig:qnoq} shows the wave-field using the standard acoustic wave equation (left) and an attenuation wave-field (right). Note
+the difference in the frequency content. This is can be more clearly seen in
+Figure \ref{fig:spectra} which shows the spectrum of wave-field at $.3,1.3,2.3$, and $3.3$ seconds with $Q=200$. Notice the energy
+decay of frequency over time. 
+The key observation is that there is no reason to worry about dispersion at frequencies that have attenuated. Specifically, I  redo my dispersion calculation (equation \ref{eq:dispersion}) several times while propagating
+a wave-field. At each time block I use a $f_{max}$ based on frequencies whose energy has not been reduced more than some percentage (in this paper 96\%).  As a result,  as I forward propagate in time my grid cells, and if I desire,  time sampling,
+get larger.  
+Figure~\ref{fig:timeQ} shows the speedup factor (defined as the number of grid cells times time steps) as a function of propagation time for different Q values.  The longer the time record, the more using Q pays off in terms speed up. 
+Using this approach the early time steps dominate the computation.  For example assuming an initial maximum frequency of 
+$90Hz$ and a constant velocity of $2000 m/s$, a Q value of $200$, the total speedup is $4$ even though  most of the 
+propagation time  shows significantly more speedup. Figure~\ref{fig:qtot} shows the speedups for Q values ranging from 150 to 350. 
+
+\plot{qnoq}{width=6.0in}{The wave-field with the standard acoustic wave equation (left) and the attenuated wave-field (right) at the same time.\ER}
+
+\sideplot{spectra}{width=3.0in}{The frequency of the wave-field at various times.  Note the reduction of the high frequencies over time. Note at .3 seconds,
+total amplitude is less because the source has not been fully injected into the medium.\ER}
+
+\sideplot{timeQ}{width=2.5in}{Speedup values as a function of propagation time for Q values ranging from 150 to 350.  Note how the longer the time record the more the computation is sped up.\ER}
+\sideplot{qtot}{width=2.5in}{Total speedup for different values of Q.  Note the relatively small speedups compared to what one might expect looking at Figure~\ref{fig:timeQ}.  Total time is the inverse of the sum of the inverses of speedups.\ER}
+\par
+Another speedup trick used by many when doing modeling/migration is to recognize that there is no need to propagate the wave-fields significantly away from the source
+at early times.  The number of cells we need to propagate increases as a  power of three (expanding wave-field)
+in modeling, and somewhat less in migration due to the spatial extent of our receivers.
+This speedup trick is most effective at early times and useless at late times when energy has propagated throughout the model, the  opposite
+behavior as the constant-Q trick. Figure~\ref{fig:follow}  shows a typical wide azimuth geometry and
+the speedup as a function of time again assuming $2 km/s$ medium. Total speedup for
+following the source is only 2-2.5.   
+Combining the two tricks is where we begin to see big payoffs.
+The left plot of Figure~\ref{fig:timeTot} shows the result of combining the two approaches for different values of
+Q.  The right plot shows the total speedup as a function of Q.  Note how the maximum cost is in the $1$ to $3$ second range
+depending on the value of Q.  Without following the wave-field the total speedup ranged from  1.8 to 4, we now get speedups between 15 and 250.
+\sideplot{follow}{width=2.5in}{Speedup by following the wave-field in the case of modeling a single shot and in the case of an array of receivers. Note how
+these curves move in the opposite direction to those in Figure~\ref{fig:timeQ}.\ER}
+\plot{timeTot}{width=6.0in}{The left plot shows speed up as a function of propagation time for a series of Q values. The right plot shows the total
+speedup as a function of Q. Note on the left how total speedup is a combination of the trends shown in Figures~\ref{fig:timeQ} and \ref{fig:follow}. Note
+on the right the significant speedup compared to those shown in Figure~\ref{fig:qtot}.\ER} Calculating speedup numbers is far from an exact science. My choice of a low constant velocity helps me by improving the speedups due to following the wave-field and hurts me by allowing larger time steps.  Computational
+time and the number of grid cells do not completely linear relation. Smaller grids, means better cache behavior, and can lead
+to significant improvements in performance. In addition my propagator is more
+expensive than the standard acoustic propagator which isn't taken into account.
+
+\begin{algorithm} \caption{Forward propagation} \label{alg:forward}
+\begin{algorithmic}[1]
+\FOR{timeblock 0...n}
+\STATE{Calculate max frequency of interest relevant at the beginning of time window}
+\STATE{Calculate max extent of wave-field at end of time window}
+\STATE{Calculate sampling of medium and time based on stability/dispersion constraints}
+\STATE{Resample wave-field and velocity}
+\FOR {t=0...n in timeblock}
+\STATE{ Propagate wave-field with Q approximation}
+\STATE{Inject source}
+\IF{Imaging step}
+\STATE{Store wave-field}
+\ENDIF
+\ENDFOR
+\ENDFOR
+ \end{algorithmic}
+\end{algorithm}
+
+The basic algorithm for modeling is shown in Algorithm~\ref{alg:forward}.  Figure~\ref{fig:sampleCompare} shows the wave-field propagating through
+a relatively complex synthetic after 2 seconds using resampling tricks (left) and a static grid (right).  
+\plot{sampleCompare}{width=6.0in}{The left panel shows the wave-field using a static grid, the 
+right panel using the approach outline in algorithm~\ref{alg:forward} both using equation~\ref{eq:use}. Note the low frequency artifact in the right panel, but otherwise
+the plots are nearly identical.\ER}
+
+
+\section{Migration}
+Applying the method described above to RTM is relatively straightforward. Modeling is done using the
+approach outlined in algorithm~\ref{alg:forward}.  Back propagation starts with low frequencies
+and then increases in frequency at smaller times.  For real data there is no need to 
+use the approximate Q propagator because the whole assumption of this approach is that
+there is no useful information at high frequencies at large times. The back projection 
+step is described in algorithm~\ref{alg:backward}.
+
+\begin{algorithm} \caption{Backward propagation for real data}\label{alg:backward}
+\begin{algorithmic}[1]
+\FOR{timeblock n...0}
+\STATE{Calculate max frequency of interest relevant at the beginning of time window}
+\STATE{Calculate max extent of wave-field at end of time window}
+\STATE{Calculate sampling of medium and time based on stability/dispersion constraints}
+\STATE{Resample wave-field, velocity}
+\STATE{Resample temp image to full image and sum}
+\STATE{Create temp image}
+\FOR {t=n..0 in timeblock}
+\STATE{ Propagate wave-field}
+\STATE{Inject source}
+\IF{Imaging step}
+\STATE{Apply imaging condition store in temp image}
+\ENDIF
+\ENDFOR
+\ENDFOR
+ \end{algorithmic}
+\end{algorithm}
+Figure~\ref{fig:single} shows the result of migrating a single shot using a standard static grid, left, and a changing grid, right.  There is significantly
+more noise, particularly away from the main energy train, using the variable grid, but the main energy train is nearly identical. Figure~\ref{fig:full}
+shows the result of migrating an entire dataset using the changing grid method. After summing all the shots the artifacts seen in Figure~\ref{fig:single}
+have disappeared.
+\plot{single}{width=6.0in}{The left plot shows the result of migrating a single shot using a static grid, the right plot shows the result using
+the changing grid described by algorithms \ref{alg:forward} and \ref{alg:backward}.  Note the spurious energy away from the main energy
+train using the changing grid.\ER}
+\plot{full}{width=6.0in}{The result of migrating an entire dataset using the changing grid approach. Note how the artifacts seen in Figure~\ref{fig:single}
+are not apparent in the final migration.\CR}
+\section{Discussion}
+The tests shown in this paper are limited to modeling and migration. Another obvious area to apply
+these techniques is velocity analysis. For waveform inversion techniques that rely on low frequencies this approach
+will lead to minimal speedup advantages but the cheap approximation of attenuation might prove useful.
+The big advantage is for  Wave Equation Migration Velocity Analysis\cite[]{Zhang.sep.152.yang1} and Total Full Waveform Inversion\cite[]{Almomin.sep.155.ali1} techniques.
+In addition to potentially a better approximation of matching the physics of the real data, these technique
+are interested in large time records and higher frequencies, which is where this approach leads to significant performance
+improvments.  The reduction in data size,  resulting
+from coarser sampling of the wave-field could also prove useful.
+
+\section{Conclusions}
+I use an approximation to \cite{zhu} to simulate propagation in an attenuated earth. I take
+advantage of the fact that frequencies decay with time by resampling my propagation grid
+at later times. Combining this approach with following the wave-field leads to
+significant speedups in modeling and RTM. The approach is also
+potentially useful for Wave Equation Migration Velocity Analysis and Total
+Full Waveform Inversion.
+
+
+
+\section{Acknowledgements}
+I would like to thank Yi Shen for the time-domain approximate-Q formulation and Gustavo Alves for
+the initial discussion that brought on this idea. I would like than Total for providing the
+data used in this paper.
+
+
+
+
+
+
+
+
+
+
+\bibliographystyle{seg}
+\bibliography{SEP,bob}

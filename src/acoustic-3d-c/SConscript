@@ -1,0 +1,35 @@
+import os
+Import('*')
+
+bin_list = [
+("acous3d", "main-fd3d.c"),
+]
+
+modules = """
+fdutil.c
+step-forward.c
+common.c
+box.c
+vel.c
+resample.c
+check.c
+          """.split()
+
+include_dir = [
+]
+
+depend_libpath = []
+depend_libs = []
+
+# clone the environment from global env and make some modification of it
+myenv   = cudaenv.Clone(CPPPATH = include_dir)
+myenv.Append(LIBPATH = depend_libpath)
+myenv.Prepend(LIBS = depend_libs)
+
+objs = myenv.StaticObject(modules)
+
+# compile each binary
+for bin in bin_list:
+  bin_obj = myenv.StaticObject(bin[1])
+  bin_target = myenv.Program(target = bin[0], source = bin_obj + objs)
+  myenv.Install("#" + dirs['bin'], bin_target)

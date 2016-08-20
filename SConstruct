@@ -23,6 +23,7 @@ dirlist = [
    ('q-elasgpu', 'src/q-elasgpu'),
    ('elasgpu', 'src/elasgpu'),
    ('elascpu', 'src/elascpu'),
+   ('acouscpu', 'src/acoustic-3d-c'),
 ]
 dirs = dict(dirlist)
 #}}}
