@@ -797,7 +797,7 @@ static void precompute(const fdm3d &fdm, float **&d_ro, float dt, int nyinterior
   sf_check_gpu_error("computeRo Kernel");
 }
 
-static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, float dt, float **d_umx, float **d_uox, float **d_upx, float **d_uax, float **d_utx, float **d_umy, float **d_uoy, float **d_upy, float **d_uay, float **d_uty, float **d_umz, float **d_uoz, float **d_upz, float **d_uaz, float **d_utz, float **d_tzz, float **d_txx, float **d_tyy, float **d_txy, float **d_tyz, float **d_tzx, float **d_c11, float **d_c22, float **d_c33, float **d_c44, float **d_c55, float **d_c66, float **d_c12, float **d_c13, float **d_c23, float **d_vp, float **d_vs, float **d_Sw000, float **d_Sw001, float **d_Sw010, float **d_Sw011, float **d_Sw100, float **d_Sw101, float **d_Sw110, float **d_Sw111, int **d_Sjz, int **d_Sjx, int **d_Sjy, float **d_Rw000, float **d_Rw001, float **d_Rw010, float **d_Rw011, float **d_Rw100, float **d_Rw101, float **d_Rw110, float **d_Rw111, int **d_Rjz, int **d_Rjx, int **d_Rjy, float **d_bell, float **d_ww, float **d_ro, float **d_bzl_s, float **d_bzh_s, float **d_bxl_s, float **d_bxh_s, float **d_byl_s, float **d_byh_s, float *** uoz, float *** uox, float *** uoy, float *h_uz, float *h_ux, float *h_uy, float ***uc, float *h_dd, float *h_dd_combined, float **d_dd, sf_axis az, sf_axis ax, sf_axis ay, const int *nylocal, float spo, float idx, float idy, float idz, int nt, int jsnap, int jdata, int ngpu, int nyinterior, int ns, int nr, int nbell, int nc, bool interp, bool snap, bool fsrf, bool ssou, bool dabc, bool verb, int &total_iter, float qp, float qs)
+static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, float dt, float **d_umx, float **d_uox, float **d_upx, float **d_uax, float **d_utx, float **d_umy, float **d_uoy, float **d_upy, float **d_uay, float **d_uty, float **d_umz, float **d_uoz, float **d_upz, float **d_uaz, float **d_utz, float **d_tzz, float **d_txx, float **d_tyy, float **d_txy, float **d_tyz, float **d_tzx, float **d_c11, float **d_c22, float **d_c33, float **d_c44, float **d_c55, float **d_c66, float **d_c12, float **d_c13, float **d_c23, float **d_vp, float **d_vs, float **d_Sw000, float **d_Sw001, float **d_Sw010, float **d_Sw011, float **d_Sw100, float **d_Sw101, float **d_Sw110, float **d_Sw111, int **d_Sjz, int **d_Sjx, int **d_Sjy, float **d_Rw000, float **d_Rw001, float **d_Rw010, float **d_Rw011, float **d_Rw100, float **d_Rw101, float **d_Rw110, float **d_Rw111, int **d_Rjz, int **d_Rjx, int **d_Rjy, float **d_bell, float **d_ww, float **d_ro, float **d_bzl_s, float **d_bzh_s, float **d_bxl_s, float **d_bxh_s, float **d_byl_s, float **d_byh_s, float *** uoz, float *** uox, float *** uoy, float *h_uz, float *h_ux, float *h_uy, float ***uc, float *h_dd, float *h_dd_combined, float **d_dd, sf_axis az, sf_axis ax, sf_axis ay, const int *nylocal, float spo, float idx, float idy, float idz, int nt, int jsnap, int jdata, int ngpu, int nyinterior, int ns, int nr, int nbell, int nc, bool interp, bool snap, bool fsrf, bool ssou, bool dabc, bool verb, int &total_iter, bool withq, float qp, float qs)
 {
   int nb = fdm->nb;
   int nx = fdm->nx;
@@ -833,9 +833,8 @@ static void main_loop(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm, float dt, fl
       cudaSetDevice(g);
       dim3 dimGrid3(ceil(fdm->nxpad/192.0f), fdm->nzpad, nyinterior);
       dim3 dimBlock3(192,1,1);
-      if (static_cast<int>(qp) == 0 && static_cast<int>(qs) == 0) {
+      if (!withq) {
         strainToStress<<<dimGrid3, dimBlock3>>>(g, fdm->nxpad, fdm->nzpad, nyinterior, d_c11[g], d_c12[g], d_c13[g], d_c22[g], d_c23[g], d_c33[g], d_c44[g], d_c55[g], d_c66[g], d_txx[g], d_tyy[g], d_tzz[g], d_txy[g], d_tyz[g], d_tzx[g]);
-
       } else {
         strainToStressQ<<<dimGrid3, dimBlock3>>>(g, fdm->nxpad, fdm->nzpad, nyinterior, dt, d_c11[g], d_c12[g], d_c13[g], d_c22[g], d_c23[g], d_c33[g], d_c44[g], d_c55[g], d_c66[g], d_txx[g], d_tyy[g], d_tzz[g], d_txy[g], d_tyz[g], d_tzx[g], d_vp[g], d_vs[g], qp, qs);
       }
@@ -1241,7 +1240,7 @@ static void make_axis(const fdm3d &fullfdm, modeling_t *m, int ngpu, sf_axis &az
  *
  * It also output the wavefield and data
  */
-static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, const float *h_vp, const float *h_vs, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, const float *h_ww, int ns, int nr, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb, int &total_iter, float qp, float qs)
+static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *rr, sf_axis az, sf_axis ax, sf_axis ay, int nt, float dt, const float *h_ro, const float *h_c11, const float *h_c22, const float *h_c33, const float *h_c44, const float *h_c55, const float *h_c66, const float *h_c12, const float *h_c13, const float *h_c23, const float *h_vp, const float *h_vs, float ***h_umx, float ***h_uox,  float ***h_umy,  float ***h_uoy,  float ***h_umz,  float ***h_uoz, const float *h_ww, int ns, int nr, int ngpu, int jdata, int jsnap, int nbell, int nc, bool interp, bool ssou,  bool dabc, bool snap, bool fsrf, bool verb, int &total_iter, bool withq, float qp, float qs)
 {
 
   /*------------------------------------------------------------*/
@@ -1303,7 +1302,7 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *r
    *  MAIN LOOP
    */
   /*------------------------------------------------------------*/
-  main_loop(Fwfl, Fdat, fdm, dt, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, d_vp, d_vs, d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, d_bell, d_ww, d_ro, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s,  uz,  ux,  uy, h_uz, h_ux, h_uy, uc, h_dd, h_dd_combined, d_dd, az, ax, ay, nylocal, spo, idx, idy, idz, nt, jsnap, jdata, ngpu, nyinterior, ns, nr, nbell, nc, interp, snap, fsrf, ssou, dabc, verb, total_iter, qp, qs);
+  main_loop(Fwfl, Fdat, fdm, dt, d_umx, d_uox, d_upx, d_uax, d_utx, d_umy, d_uoy, d_upy, d_uay, d_uty, d_umz, d_uoz, d_upz, d_uaz, d_utz, d_tzz, d_txx, d_tyy, d_txy, d_tyz, d_tzx, d_c11, d_c22, d_c33, d_c44, d_c55, d_c66, d_c12, d_c13, d_c23, d_vp, d_vs, d_Sw000, d_Sw001, d_Sw010, d_Sw011, d_Sw100, d_Sw101, d_Sw110, d_Sw111, d_Sjz, d_Sjx, d_Sjy, d_Rw000, d_Rw001, d_Rw010, d_Rw011, d_Rw100, d_Rw101, d_Rw110, d_Rw111, d_Rjz, d_Rjx, d_Rjy, d_bell, d_ww, d_ro, d_bzl_s, d_bzh_s, d_bxl_s, d_bxh_s, d_byl_s, d_byh_s,  uz,  ux,  uy, h_uz, h_ux, h_uy, uc, h_dd, h_dd_combined, d_dd, az, ax, ay, nylocal, spo, idx, idy, idz, nt, jsnap, jdata, ngpu, nyinterior, ns, nr, nbell, nc, interp, snap, fsrf, ssou, dabc, verb, total_iter, withq, qp, qs);
 
   gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_umx, d_umy, d_umz, h_umx, h_umy, h_umz, nyinterior, ngpu);
   gather_from_gpu(fdm, h_ux, h_uy, h_uz, d_uox, d_uoy, d_uoz, h_uox, h_uoy, h_uoz, nyinterior, ngpu);
@@ -1389,6 +1388,15 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *r
   }
 }
 
+static char *genWflName(int iblock, float qp, float qs) {
+  static char fn[512];
+  char *p = sf_getstring("wfl");
+  strncpy(fn, p, strlen(p) + 1);
+  p = strstr(fn, ".rsf");
+  sprintf(p, "-qp%d-qs%d-b%d.rsf", (int)qp, (int)qs, iblock);
+  sf_warning(fn);
+  return fn;
+}
 // entry point
 int main(int argc, char* argv[]) {
 
@@ -1568,6 +1576,11 @@ int main(int argc, char* argv[]) {
   float ***h_ro, ***h_c11, ***h_c22, ***h_c33, ***h_c44, ***h_c55, ***h_c66, ***h_c12, ***h_c13, ***h_c23;
   init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, full_h_vp, full_h_vs, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, h_vp, h_vs);
 
+  if (withq) {
+    sf_warning("Q approximation enabled, qp: %.1f, qs:%.1f", qp, qs);
+  } else {
+    sf_warning("No Q approximation");
+  }
   int total_iter = 0;
   sf_warning("init cuda device ...");
   for (int g = 0; g < ngpu; g++){
@@ -1599,8 +1612,7 @@ int main(int argc, char* argv[]) {
 
     update_axis(fdm, curaz, curax, curay, verb);
 
-    char fn[512];
-    sprintf(fn, "VTIw-3d-GPU-b%d.rsf", iblock);
+    char *fn = genWflName(iblock, qp, qs);
     sf_file Fwfl = sf_output(fn);
     set_output_wfd_time_block(Fwfl, at, curaz, curax, curay, ac, curnt, total_iter, curdt, jsnap, verb);
 
@@ -1610,7 +1622,7 @@ int main(int argc, char* argv[]) {
     sf_warning("iterpolating wavefields");
     interp_host_umo_patch_n(oldfdm, fdm, sinc_table, ntab, lsinc, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz);
 
-    run(Fwfl, Fdat, fdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_vp[0][0], h_vs[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, h_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter, qp, qs);
+    run(Fwfl, Fdat, fdm, ss, rr, curaz, curax, curay, curnt, curdt, h_ro[0][0], h_c11[0][0], h_c22[0][0], h_c33[0][0], h_c44[0][0], h_c55[0][0], h_c66[0][0], h_c12[0][0], h_c13[0][0], h_c23[0][0], h_vp[0][0], h_vs[0][0], h_umx, h_uox, h_umy, h_uoy, h_umz, h_uoz, h_ww, ns, nr, ngpu, jdata, jsnap, nbell, nc, interp, ssou, dabc, snap, fsrf, verb, total_iter, withq, qp, qs);
 
     oldfdm = clonefdm(fdm);
   }

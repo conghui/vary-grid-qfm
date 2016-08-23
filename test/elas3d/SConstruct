@@ -26,7 +26,7 @@ par = {
     # Output
     'height':5,
 
-    'qp': 20, 'qs': 20, # buggy, only support 0
+    'withq': 'n', 'qp': 20, 'qs': 20,
     'ngpu':2, 'timeblocks':1
     }
 
@@ -178,6 +178,7 @@ for exe in ['gpu']:
         ngpu=%(ngpu)d jdata=%(jdata)d verb=%(verb)s free=n ssou=%(ssou)s
         opot=n snap=%(snap)s jsnap=%(jsnap)d timeblocks=%(timeblocks)d
         dabc=%(dabc)s nb=%(nb)d nbell=%(nbell)d qp=%(qp)f qs=%(qs)f
+        withq=%(withq)s
         ''' %par)
 
     print '\n\n'
