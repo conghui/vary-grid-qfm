@@ -135,7 +135,7 @@ static void gather_from_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h
   }
 }
 
-static void init_host_den_vel(const fdm3d &fdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***full_h_vp, float ***full_h_vs, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23, float ***&h_vp, float ***h_vs)
+static void init_host_den_vel(const fdm3d &fdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***full_h_vp, float ***full_h_vs, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23, float ***&h_vp, float ***&h_vs)
 {
   int bytes = fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float);
   h_ro  = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_ro [0][0], full_h_ro [0][0], bytes);
@@ -1543,6 +1543,8 @@ int main(int argc, char* argv[]) {
   sf_floatread(vs[0][0], nx*ny*nz, Fvels);
   float ***full_h_vp = sf_floatalloc3(fullfdm->nzpad, fullfdm->nxpad, fullfdm->nypad);
   float ***full_h_vs = sf_floatalloc3(fullfdm->nzpad, fullfdm->nxpad, fullfdm->nypad);
+  expand_cpu(vp[0][0],full_h_vp[0][0],fullfdm->nb, nx, fullfdm->nxpad, ny, fullfdm->nypad, nz, fullfdm->nzpad);
+  expand_cpu(vs[0][0],full_h_vs[0][0],fullfdm->nb, nx, fullfdm->nxpad, ny, fullfdm->nypad, nz, fullfdm->nzpad);
 
   sf_seek(Fvelp, 0, SEEK_SET);
   sf_seek(Fvels, 0, SEEK_SET);

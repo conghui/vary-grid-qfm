@@ -427,10 +427,8 @@ __global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior,
     float c22 = d_c22[cAddr];
     float c23 = d_c23[cAddr];
     float c33 = d_c33[cAddr];
-    //float vp  = d_vp[cAddr];
-    //float vs  = d_vs[cAddr];
-    float vp  = 2000;
-    float vs  = 1154.7;
+    float vp  = d_vp[cAddr];
+    float vs  = d_vs[cAddr];
 
     float txx = d_txx[tAddr];
     float tyy = d_tyy[tAddr];

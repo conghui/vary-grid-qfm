@@ -12,21 +12,21 @@ par = {
 
     # receiver locations
     'rnz':1,   'roz':0, 'rdz':10,
-    'rnx':40,  'rox':0, 'rdx':10,
-    'rny':2,   'roy':0, 'rdy':10,
+    'rnx':112, 'rox':0, 'rdx':10,
+    'rny':112, 'roy':0, 'rdy':10,
 
     # Time Parameters
     'nt':400,'ot':0, 'dt':0.002,  'lt':'t', 'ut':'s',
     'kt':100,'frq':10,
 
     # Modelling parameters
-    'jsnap':100, 'nb':44, 'verb':'y',
+    'snap': 'y', 'jsnap':20, 'nb':44, 'verb':'y',
     'nbell':5,  'jdata':8,'ssou':'y',
 
     # Output
     'height':5,
 
-    'qp': 0, 'qs': 0, # buggy, only support 0
+    'qp': 20, 'qs': 20, # buggy, only support 0
     'ngpu':2, 'timeblocks':1
     }
 
@@ -162,7 +162,8 @@ Flow('times', 'vp-3d', 'window j1=8 j2=8 j3=8 | ../../src/acoustic-3d-fortran/ma
 # ------------------------------------------------------------
 # . . Elastic Modeling Section
 # . . Perform 3D modelling
-for exe in ['gpu', 'cpu']:
+# for exe in ['gpu_std', 'cpu']:
+for exe in ['gpu']:
     Flow(['VTId-3d-' + exe,'VTIw-3d-' + exe], ['wave-3d','VTIc-3d','ro-3d','ss-3d','rr-3d', 'vp-3d', 'times', 'vs-3d'],
         '../../bin/elas3d' + exe +
         '''
