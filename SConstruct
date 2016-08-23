@@ -11,7 +11,7 @@ additional_libs     = ['rsf', 'su']
 c_compiler   = ['/usr/bin/gcc', '-std=c99', '-march=native']
 cxx_compiler = ['/usr/bin/g++', '-fopenmp', '-march=native']
 linker       = ['/usr/bin/g++', '-fopenmp', '-march=native']
-cur_cflags   = ['-Wall', '-Wextra', '-fopenmp', '-O3', '-DNO_BLAS',]
+cur_cflags   = ['-Wall', '-Wextra', '-fopenmp', '-O3', '-g', '-DNO_BLAS',]
 cuda_cc      = ['nvcc', '--compiler-bindir', '/usr/bin/g++', '-arch=sm_35']
 cuda_flags   = ['-O2']
 
@@ -21,6 +21,7 @@ dirlist = [
    ('lib', 'lib'),
    ('bin', 'bin'),
    ('elasgpu', 'src/elastic-3d-gpu'),
+   ('elasgpustd', 'src/elastic-3d-gpu-std'),
    ('elascpu', 'src/elastic-3d-cpu'),
    ('acouscpu', 'src/acoustic-3d-c'),
    ('acousfortran', 'src/acoustic-3d-fortran'),

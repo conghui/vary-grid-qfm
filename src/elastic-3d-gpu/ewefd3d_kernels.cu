@@ -427,15 +427,15 @@ __global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior,
     float c22 = d_c22[cAddr];
     float c23 = d_c23[cAddr];
     float c33 = d_c33[cAddr];
-    float vp  = d_vp[cAddr];
-    float vs  = d_vs[cAddr];
+    //float vp  = d_vp[cAddr];
+    //float vs  = d_vs[cAddr];
+    float vp  = 2000;
+    float vs  = 1154.7;
 
     float txx = d_txx[tAddr];
     float tyy = d_tyy[tAddr];
     float tzz = d_tzz[tAddr];
 
-    float qp = 1;
-    float qs = 1;
     float gamma_p = 1.0/SF_PI*atan(1/qp);
     float gamma_s = 1.0/SF_PI*atan(1/qs);
     float tau_11 = c11*powf(vp,2*gamma_p-1) * sin(SF_PI * gamma_p) / dt;
@@ -446,6 +446,7 @@ __global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior,
                    (tau_11 - 2 * tau_33 + c13) * tzz;
     d_tzx[tAddr] = (tau_33 + d_c55[cAddr]) * d_tzx[tAddr];
 
+      //printf("z: %d, x: %d, gamma_p: %f, gamma_s: %f, qp: %f, qs: %f, c11:%f, vp:%f, vs:%f, dt:%f, tau_11: %f, tau_22: %f, tau_33: %f, d_txx: %f, d_tzx: %f\n", z, x, gamma_p, gamma_s, qp, qs, c11, vp, vs, tau_11, tau_22, tau_33, d_txx[tAddr], d_tzx[tAddr]);
     /////////////////////////////
 
     tau_11 = (c22-c12)/2 * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;

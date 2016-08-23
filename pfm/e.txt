@@ -1,0 +1,29 @@
+
+par = {
+    # Space parameters
+    # 616
+    'nz':256,  'oz':0, 'dz':10,  'lz':'z', 'uz':'m',
+    'nx':256,  'ox':0, 'dx':10,  'lx':'x', 'ux':'m',
+    'ny':160,  'oy':0, 'dy':10,  'ly':'y', 'uy':'m',
+
+    # receiver locations
+    'rnz':1,   'roz':0, 'rdz':10,
+    'rnx':112, 'rox':0, 'rdx':10,
+    'rny':112, 'roy':0, 'rdy':10,
+
+    # Time Parameters
+    'nt':400,'ot':0, 'dt':0.002,  'lt':'t', 'ut':'s',
+    'kt':100,'frq':10,
+
+    # Modelling parameters
+    'snap': 'n', 'jsnap':1000, 'nb':44, 'verb':'y',
+    'nbell':5,  'jdata':8,'ssou':'y',
+
+    # Output
+    'height':5,
+
+    'qp': 0, 'qs': 0, # buggy, only support 0
+    'ngpu':2, 'timeblocks':1
+    }
+
+1.07, 19.73, 571.68, 0.1

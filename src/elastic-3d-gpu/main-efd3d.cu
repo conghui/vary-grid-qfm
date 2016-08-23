@@ -587,8 +587,8 @@ static void copy_den_vel_to_dev(const fdm3d &fdm, float **&d_ro , float **&d_c11
     cudaMemcpy(d_c12[g], h_c12 + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
     cudaMemcpy(d_c13[g], h_c13 + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
     cudaMemcpy(d_c23[g], h_c23 + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
-    cudaMemcpy(d_vp[g], h_vp + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
-    cudaMemcpy(d_vs[g], h_vs + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_vp[g],   h_vp + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
+    cudaMemcpy(d_vs[g],   h_vs + g * nyinterior * fdm->nzpad * fdm->nxpad, nyinterior * fdm->nzpad * fdm->nxpad * sizeof(float), cudaMemcpyDefault);
     sf_check_gpu_error("copy density and stiffness to device");
 
   }

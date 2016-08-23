@@ -1,5 +1,6 @@
 #include <rsf.h>
 #include "box.h"
+#include <assert.h>
 
 static int   gs_timeblocks;
 static float gs_vmin;
@@ -210,10 +211,12 @@ box_t *calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, 
 
   sf_warning("say hello at: %s: %d", __FILE__, __LINE__);
   for (int i = 0; i < nr; i++) {
-    int i5 = fminf(fmaxf(round((rec3d[i].y - times->o5) / times->d5), 0), times->n5);
-    int i4 = fminf(fmaxf(round((rec3d[i].x - times->o4) / times->d4), 0), times->n4);
+    int i5 = fminf(fmaxf(round((rec3d[i].y - times->o5) / times->d5), 0), times->n5 - 1);
+    int i4 = fminf(fmaxf(round((rec3d[i].x - times->o4) / times->d4), 0), times->n4 - 1);
 
     /*sf_warning("i4, i5: %d, %d", i4, i5);*/
+    assert(i4 < times->n4);
+    assert(i5 < times->n5);
     for (int i3 = 0; i3 < times->n3; i3++) {
       for (int i2 = 0; i2 < times->n2; i2++) {
         for (int i1 = 0; i1 < times->n1; i1++) {

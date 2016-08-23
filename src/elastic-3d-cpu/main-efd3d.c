@@ -695,7 +695,9 @@ int main(int argc, char* argv[])
   free(**tyz); free(*tyz); free(tyz);
   free(**tzx); free(*tzx); free(tzx);
 
-  free(**uc);  free(*uc);  free(uc);
+  if (snap) {
+    free(**uc);  free(*uc);  free(uc);
+  }
 
   if(opot) {
     free(**qp);  free(*qp);  free(qp);
