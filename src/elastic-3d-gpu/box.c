@@ -189,7 +189,7 @@ void init_box(int timeblocks, float vmin, float vmax, float dmin, float dmax, fl
   gs_downfact   = downfact;
   gs_dt         = dt;
 
-  float dstable   = 0.499 * dmin / vmax;
+  float dstable   = 0.49 * dmin / vmax;
   gs_dtbig      = calgoodsampling(dstable);
 
   sf_warning("dt: %f", gs_dt);

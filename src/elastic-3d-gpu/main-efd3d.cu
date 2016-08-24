@@ -1602,9 +1602,7 @@ int main(int argc, char* argv[]) {
     sf_axis curay = sf_maxa(1,1,1); // dummy, update later
     modeling_t *cur = &domain->hyper[iblock];
     int curnt = cur->ntblock; sf_warning("curnt: %d", curnt);
-    float curdt = dt;
-    sf_warning("dt: %f, cur->dt: %f", curdt, cur->dt);
-    //assert(fabs(curdt - cur->dt) < 0.0001);
+    float curdt = cur->dt; sf_warning("dt: %f, cur->dt: %f", curdt, cur->dt);
 
     make_axis(fullfdm, cur, ngpu, curaz, curax, curay);
 
