@@ -1272,7 +1272,7 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *r
   for (int i = 0; i < ngpu; i++) {
     sf_warning("nylocal[%d]: %d", i, nylocal[i]);
   }
-  if(snap) { alloc_wlf(fdm, uz, ux, uy, h_uz, h_ux, h_uy, uc, nyinterior); }
+  alloc_wlf(fdm, uz, ux, uy, h_uz, h_ux, h_uy, uc, nyinterior);
   float **d_Sw000,  **d_Sw001,  **d_Sw010,  **d_Sw011,  **d_Sw100,  **d_Sw101,  **d_Sw110,  **d_Sw111;
   float **d_Rw000,  **d_Rw001,  **d_Rw010,  **d_Rw011,  **d_Rw100,  **d_Rw101,  **d_Rw110,  **d_Rw111;
   int **d_Sjz,  **d_Sjx,  **d_Sjy;
@@ -1312,13 +1312,11 @@ static void run(sf_file Fwfl, sf_file Fdat, const fdm3d &fdm,  pt3d *ss, pt3d *r
 
   free(h_dd); free(h_dd_combined);
 
-  if (snap){
-    free(h_uz); free(h_ux); free(h_uy);
-    free(**uc);  free(*uc);  free(uc);
-    free(**uz); free(*uz); free(uz);
-    free(**ux); free(*ux); free(ux);
-    free(**uy); free(*uy); free(uy);
-  }
+  free(h_uz); free(h_ux); free(h_uy);
+  free(**uc);  free(*uc);  free(uc);
+  free(**uz); free(*uz); free(uz);
+  free(**ux); free(*ux); free(ux);
+  free(**uy); free(*uy); free(uy);
 
 
   /*------------------------------------------------------------*/
@@ -1486,9 +1484,7 @@ int main(int argc, char* argv[]) {
   if(! sf_getint("nbell",&nbell)) nbell=5;  /* bell size */
   if(verb) sf_warning("nbell=%d",nbell);
   if(! sf_getint("jdata",&jdata)) jdata=1;  /* extract receiver data every jdata time steps */
-  if(snap) {
-    if(! sf_getint("jsnap",&jsnap)) jsnap=nt;  /* save wavefield every jsnap time steps */
-  }
+  if(! sf_getint("jsnap",&jsnap)) jsnap=nt;  /* save wavefield every jsnap time steps */
 
   if( !sf_getint("nb",&nb) || nb<NOP) nb=NOP;
 
