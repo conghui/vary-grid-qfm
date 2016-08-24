@@ -26,3 +26,10 @@ I create a two test cases in `test/` directory. Enter one of them and run `scons
 
 ## Data dependency
 In the `src/acoustic-2d-fortran` and `src/acoustic-3d-fortran`, additional data are needed to run the program. The data is not public to others. You may ask [Bob](bob@sep.stanford.edu)'s permission if necessary.
+
+## Acknowledgment
+1. Many thanks Bob for handing over the 2D acoustic code and answering all questions.
+2. Thanks Yi Shen for deriving 3D elastic Q approximation formulations.
+3. Thanks Gustavo for discussing 3D elastic modeling.
+4. Thanks SEPLib and Madagascar repo for the code. Part of the code in this project is borrowed from Madagascar and SEPLib. Then I add my work on it.
+

@@ -180,6 +180,4 @@ for exe in ['gpu']:
         dabc=%(dabc)s nb=%(nb)d nbell=%(nbell)d qp=%(qp)f qs=%(qs)f
         withq=%(withq)s
         ''' %par)
-
-    print '\n\n'
 End()
