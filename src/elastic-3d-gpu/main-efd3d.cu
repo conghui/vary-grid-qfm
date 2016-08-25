@@ -137,19 +137,38 @@ static void gather_from_gpu(const fdm3d &fdm, float *h_ux, float *h_uy, float *h
 
 static void init_host_den_vel(const fdm3d &fdm, float ***full_h_ro, float ***full_h_c11, float ***full_h_c22, float ***full_h_c33, float ***full_h_c44, float ***full_h_c55, float ***full_h_c66, float ***full_h_c12, float ***full_h_c13, float ***full_h_c23, float ***full_h_vp, float ***full_h_vs, float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23, float ***&h_vp, float ***&h_vs)
 {
-  int bytes = fdm->nzpad * fdm->nxpad * fdm->nypad * sizeof(float);
-  h_ro  = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_ro [0][0], full_h_ro [0][0], bytes);
-  h_c11 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c11[0][0], full_h_c11[0][0], bytes);
-  h_c22 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c22[0][0], full_h_c22[0][0], bytes);
-  h_c33 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c33[0][0], full_h_c33[0][0], bytes);
-  h_c44 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c44[0][0], full_h_c44[0][0], bytes);
-  h_c55 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c55[0][0], full_h_c55[0][0], bytes);
-  h_c66 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c66[0][0], full_h_c66[0][0], bytes);
-  h_c12 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c12[0][0], full_h_c12[0][0], bytes);
-  h_c13 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c13[0][0], full_h_c13[0][0], bytes);
-  h_c23 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);  memcpy(h_c23[0][0], full_h_c23[0][0], bytes);
-  h_vp = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);   memcpy(h_vp[0][0], full_h_vp[0][0], bytes);
-  h_vs = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad);   memcpy(h_vs[0][0], full_h_vs[0][0], bytes);
+ assert(h_ro  = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_c11 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_c22 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_c33 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_c44 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_c55 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_c66 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_c12 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_c13 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_c23 = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_vp = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+ assert(h_vs = sf_floatalloc3(fdm->nzpad, fdm->nxpad, fdm->nypad));
+
+#pragma omp parallel for
+  for (int iy = 0; iy < fdm->nypad; iy++) {
+    for (int ix = 0; ix < fdm->nxpad; ix++) {
+      for (int iz = 0; iz < fdm->nzpad; iz++) {
+        h_ro[iy][ix][iz] = full_h_ro[iy][ix][iz];
+        h_c11[iy][ix][iz] = full_h_c11[iy][ix][iz];
+        h_c22[iy][ix][iz] = full_h_c22[iy][ix][iz];
+        h_c33[iy][ix][iz] = full_h_c33[iy][ix][iz];
+        h_c44[iy][ix][iz] = full_h_c44[iy][ix][iz];
+        h_c55[iy][ix][iz] = full_h_c55[iy][ix][iz];
+        h_c66[iy][ix][iz] = full_h_c66[iy][ix][iz];
+        h_c12[iy][ix][iz] = full_h_c12[iy][ix][iz];
+        h_c13[iy][ix][iz] = full_h_c13[iy][ix][iz];
+        h_c23[iy][ix][iz] = full_h_c23[iy][ix][iz];
+        h_vp[iy][ix][iz] = full_h_vp[iy][ix][iz];
+        h_vs[iy][ix][iz] = full_h_vs[iy][ix][iz];
+      }
+    }
+  }
 }
 
 static void release_host_den_vel(float ***&h_ro, float ***&h_c11, float ***&h_c22, float ***&h_c33, float ***&h_c44, float ***&h_c55, float ***&h_c66, float ***&h_c12, float ***&h_c13, float ***&h_c23)
@@ -221,14 +240,30 @@ static void init_host_umo(const fdm3d &fdm, float ***&h_umx, float ***&h_uox,  f
   int n1 = fdm->nzpad; int n2 = fdm->nxpad; int n3 = fdm->nypad;
   int bytes = n1 * n2 * n3 * sizeof(float);
 
-  h_umz = sf_floatalloc3(n1, n2, n3); memset(h_umz[0][0], 0, bytes);
-  h_umx = sf_floatalloc3(n1, n2, n3); memset(h_umx[0][0], 0, bytes);
-  h_umy = sf_floatalloc3(n1, n2, n3); memset(h_umy[0][0], 0, bytes);
-  h_uoz = sf_floatalloc3(n1, n2, n3); memset(h_uoz[0][0], 0, bytes);
-  h_uox = sf_floatalloc3(n1, n2, n3); memset(h_uox[0][0], 0, bytes);
-  h_uoy = sf_floatalloc3(n1, n2, n3); memset(h_uoy[0][0], 0, bytes);
-  h_vp = sf_floatalloc3(n1, n2, n3); memset(h_uoy[0][0], 0, bytes);
-  h_vs = sf_floatalloc3(n1, n2, n3); memset(h_uoy[0][0], 0, bytes);
+  h_umz = sf_floatalloc3(n1, n2, n3);
+  h_umx = sf_floatalloc3(n1, n2, n3);
+  h_umy = sf_floatalloc3(n1, n2, n3);
+  h_uoz = sf_floatalloc3(n1, n2, n3);
+  h_uox = sf_floatalloc3(n1, n2, n3);
+  h_uoy = sf_floatalloc3(n1, n2, n3);
+  h_vp = sf_floatalloc3(n1, n2, n3);
+  h_vs = sf_floatalloc3(n1, n2, n3);
+
+#pragma omp parallel for
+  for (int iy = 0; iy < n3; iy++) {
+    for (int ix = 0; ix < n2; ix++) {
+      for (int iz = 0; iz < n1; iz++) {
+        h_umz[iy][ix][iz] = 0;
+        h_umx[iy][ix][iz] = 0;
+        h_umy[iy][ix][iz] = 0;
+        h_uoz[iy][ix][iz] = 0;
+        h_uox[iy][ix][iz] = 0;
+        h_uoy[iy][ix][iz] = 0;
+        h_uoy[iy][ix][iz] = 0;
+        h_uoy[iy][ix][iz] = 0;
+      }
+    }
+  }
 }
 
 static void release_host_umo(float ***&h_umx, float ***&h_uox,  float ***&h_umy,  float ***&h_uoy,  float ***&h_umz,  float ***&h_uoz)
@@ -250,7 +285,7 @@ static void sf_check_gpu_error (const char *msg) {
 }
 
 static void update_axis(const fdm3d &fdm, sf_axis &az, sf_axis &ax, sf_axis &ay, bool verb) {
-  sf_warning("extended dimensions:");
+  //sf_warning("extended dimensions:");
   sf_setn(az,fdm->nzpad); sf_seto(az,fdm->ozpad); if(verb) sf_raxa(az);
   sf_setn(ax,fdm->nxpad); sf_seto(ax,fdm->oxpad); if(verb) sf_raxa(ax);
   sf_setn(ay,fdm->nypad); sf_seto(ay,fdm->oypad); if(verb) sf_raxa(ay);
@@ -1226,7 +1261,7 @@ static void make_axis(const fdm3d &fullfdm, modeling_t *m, int ngpu, sf_axis &az
   //ax = sf_maxa(m->n2 - 2 * m->nb, m->o2 + m->nb * m->d2, m->d2);
   //ay = sf_maxa(m->n3 - 2 * m->nb, m->o3 + m->nb * m->d3, m->d3);
 
-  sf_warning("actual dimensions");
+  //sf_warning("actual dimensions");
   az = sf_maxa(n1, m->o1 + m->nb * m->d1, m->d1); sf_raxa(az);
   ax = sf_maxa(n2, m->o2 + m->nb * m->d2, m->d2); sf_raxa(ax);
   ay = sf_maxa(n3, m->o3 + m->nb * m->d3, m->d3); sf_raxa(ay);
@@ -1438,12 +1473,11 @@ int main(int argc, char* argv[]) {
   /*------------------------------------------------------------*/
   /* execution flags */
   if(! sf_getbool("verb",&verb)) verb=false; /* verbosity flag */
-  if(! sf_getbool("snap",&snap)) snap=true; /* wavefield snapshots flag */
+  if(! sf_getbool("snap",&snap)) snap=true;
   if(! sf_getbool("free",&fsrf)) fsrf=false; /* free surface flag */
   if(! sf_getbool("ssou",&ssou)) ssou=false; /* stress source */
   if(! sf_getbool("dabc",&dabc)) dabc=false; /* absorbing BC */
   if(! sf_getbool("interp",&interp)) interp=true; /* perform linear interpolation on receiver data */
-
 
   /*------------------------------------------------------------*/
   /* I/O files */
@@ -1530,7 +1564,6 @@ int main(int argc, char* argv[]) {
   if (!sf_getfloat("error", &error)) error = 20;
   if (!sf_getfloat("errorfact", &errorfact)) errorfact = 1.2;
   if (!sf_getfloat("downfact", &downfact)) downfact = 0.04;
-  if (!sf_getfloat("qfact", &qfact)) qfact = 50; // copy from vel_mod.f90
   if (!sf_getfloat("w0", &w0)) w0 = 60;
   if (!sf_getbool("withq", &withq)) withq = false;
   if (!sf_getint("ntab", &ntab)) ntab = 1000;
@@ -1538,6 +1571,10 @@ int main(int argc, char* argv[]) {
   if (!sf_getfloat("qp", &qp)) qp = 0;
   if (!sf_getfloat("qs", &qs)) qs = 0;
 
+  if (fabs(qp - qs) > 1) {
+    sf_error("we only support qp == qs");
+  }
+  qfact = qp;
 
   sf_file Fvelp = sf_input("vp"); // p wave velocity
   sf_file Fvels = sf_input("vs"); // s wave velocity
@@ -1560,16 +1597,20 @@ int main(int argc, char* argv[]) {
   init_box(timeblocks, vmin, vmax, dmin, dmax, maxf, nb, error, errorfact, qfact, downfact, dt);
   box_t *domain = calc_shot_box(vv0, times, ss, rr, nr, nt, dt);
 
+  sf_warning("make modeling");
   modeling_t initmodel = make_modeling(vv0);
 
+  sf_warning("clone fdm");
   fdm3d oldfdm = clonefdm(fullfdm);
 
   // initialize host prev and current wavefield
   float ***h_umx, ***h_uox,  ***h_umy,  ***h_uoy,  ***h_umz,  ***h_uoz, ***h_vp, ***h_vs;
+  sf_warning("init host prev and curr wavefields");
   init_host_umo(oldfdm, h_umx, h_uox,  h_umy,  h_uoy,  h_umz,  h_uoz, h_vp, h_vs);
 
   // initialize varying density and velocity
   float ***h_ro, ***h_c11, ***h_c22, ***h_c33, ***h_c44, ***h_c55, ***h_c66, ***h_c12, ***h_c13, ***h_c23;
+  sf_warning("init host density and velocities");
   init_host_den_vel(fullfdm, full_h_ro, full_h_c11, full_h_c22, full_h_c33, full_h_c44, full_h_c55, full_h_c66, full_h_c12, full_h_c13, full_h_c23, full_h_vp, full_h_vs, h_ro, h_c11, h_c22, h_c33, h_c44, h_c55, h_c66, h_c12, h_c13, h_c23, h_vp, h_vs);
 
   if (withq) {

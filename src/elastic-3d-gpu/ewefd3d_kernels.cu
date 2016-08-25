@@ -442,6 +442,8 @@ __global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior,
     d_txx[tAddr] = (tau_11 + c11)              * txx +
                    (tau_11 - 2 * tau_22 + c12) * tyy +
                    (tau_11 - 2 * tau_33 + c13) * tzz;
+
+    tau_33 = (c33-c13) * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;
     d_tzx[tAddr] = (tau_33 + d_c55[cAddr]) * d_tzx[tAddr];
 
       //printf("z: %d, x: %d, gamma_p: %f, gamma_s: %f, qp: %f, qs: %f, c11:%f, vp:%f, vs:%f, dt:%f, tau_11: %f, tau_22: %f, tau_33: %f, d_txx: %f, d_tzx: %f\n", z, x, gamma_p, gamma_s, qp, qs, c11, vp, vs, tau_11, tau_22, tau_33, d_txx[tAddr], d_tzx[tAddr]);
@@ -453,6 +455,8 @@ __global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior,
     d_tyy[tAddr] = (tau_22 - 2 * tau_11 + c12) * txx +
                    (tau_22 + c22)              * tyy +
                    (tau_22 - 2 * tau_33 + c23) * tzz;
+
+    tau_33 = (c22-c23) * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;
     d_tyz[tAddr] = (tau_33 + d_c44[cAddr]) * d_tyz[tAddr];
 
     /////////////////////////////
@@ -464,7 +468,8 @@ __global__ void strainToStressQ(int gpuID, int nxpad, int nzpad, int nyinterior,
                    (tau_33 - 2 * tau_22 + c23) * tyy + 
                    (tau_33 + c33)              * tzz;
 
-    d_txy[tAddr] = (tau_22 + d_c66[cAddr]) * d_txy[tAddr];
+    tau_11 = (c11-c12) * powf(vs,2*gamma_s-1) * sin(SF_PI * gamma_s) / dt;
+    d_txy[tAddr] = (tau_11 + d_c66[cAddr]) * d_txy[tAddr];
 
   }
 

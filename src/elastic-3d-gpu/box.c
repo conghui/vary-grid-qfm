@@ -117,8 +117,8 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
   mod->n3 = n[2] + 2 * mod->nb;
 
   float dtmax = 0.49 * dsamp / vmax;
-  mod->dt = calgoodsampling(dtmax);
-  /*mod->dt = gs_dt; // TODO: update dt*/
+  /*mod->dt = calgoodsampling(dtmax);*/
+  mod->dt = gs_dt; // TODO: update dt
   mod->ntblock = (timemax - timemin) / mod->dt;
   mod->dtextra = (timemax - timemin) - mod->dt * mod->ntblock;
 
@@ -132,7 +132,8 @@ static void create_modeling(modeling_t *mod, const vel_t *vel, const times_t *ti
   float smallsize = 0.001 * mod->n1 * mod->n2 * mod->n3;
   float fullsize =  0.001*(vel->n1+2*mod->nb)*(vel->n2+2*mod->nb)*(vel->n3+2*mod->nb);
   float small = smallsize * mod->ntblock;
-  float large = fullsize * (timemax - timemin) / gs_dtbig;
+  /*float large = fullsize * (timemax - timemin) / gs_dtbig;*/
+  float large = fullsize * (timemax - timemin) / gs_dt;
   /*sf_warning("smallsize_: %f, ntblock: %d, small: %f", smallsize, mod->ntblock, small);*/
   /*sf_warning("small_: %d", small);*/
   *totalsmallcells += small;
@@ -209,24 +210,22 @@ box_t *calc_shot_box(const vel_t *vel, const times_t *times, const pt3d *src3d, 
   memcpy(minT[0][0], times->val[i5][i4][0][0],
       sizeof(float) * times->n1 * times->n2 * times->n3);
 
-  sf_warning("say hello at: %s: %d", __FILE__, __LINE__);
-  for (int i = 0; i < nr; i++) {
-    int i5 = fminf(fmaxf(round((rec3d[i].y - times->o5) / times->d5), 0), times->n5 - 1);
-    int i4 = fminf(fmaxf(round((rec3d[i].x - times->o4) / times->d4), 0), times->n4 - 1);
+  /*sf_warning("computing minT at: %s: %d", __FILE__, __LINE__);*/
+  /*for (int i = 0; i < nr; i++) {*/
+    /*int i5 = fminf(fmaxf(round((rec3d[i].y - times->o5) / times->d5), 0), times->n5 - 1);*/
+    /*int i4 = fminf(fmaxf(round((rec3d[i].x - times->o4) / times->d4), 0), times->n4 - 1);*/
 
-    /*sf_warning("i4, i5: %d, %d", i4, i5);*/
-    assert(i4 < times->n4);
-    assert(i5 < times->n5);
-    for (int i3 = 0; i3 < times->n3; i3++) {
-      for (int i2 = 0; i2 < times->n2; i2++) {
-        for (int i1 = 0; i1 < times->n1; i1++) {
-          minT[i3][i2][i1] = fminf(minT[i3][i2][i1], times->val[i5][i4][i3][i2][i1]);
-        }
-      }
-    }
-  }
+    /*for (int i3 = 0; i3 < times->n3; i3++) {*/
+      /*for (int i2 = 0; i2 < times->n2; i2++) {*/
+        /*for (int i1 = 0; i1 < times->n1; i1++) {*/
 
-  sf_warning("say hello at: %s: %d", __FILE__, __LINE__);
+          /*minT[i3][i2][i1] = fminf(minT[i3][i2][i1], times->val[i5][i4][i3][i2][i1]);*/
+        /*}*/
+      /*}*/
+    /*}*/
+  /*}*/
+
+  /*sf_warning("say hello at: %s: %d", __FILE__, __LINE__);*/
   /*sf_file file_minT = sf_output("minT.rsf");*/
   /*sf_putint(file_minT, "n1", times->n1);*/
   /*sf_putint(file_minT, "n2", times->n2);*/
