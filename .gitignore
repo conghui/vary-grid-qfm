@@ -21,3 +21,4 @@ build/
 job/
 .project
 .cproject
+.envrc

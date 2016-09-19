@@ -1,0 +1,11 @@
+*.aux
+*.log
+*.bbl
+*.blg
+*.out
+*.pdfsync
+*.synctex.gz
+*.fls
+.sconsign.dblite
+
+paper.pdf

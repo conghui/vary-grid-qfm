@@ -1,0 +1,66 @@
+\documentclass{paris17}
+\begin{document}
+
+\section{Introduction}
+
+Imaging and velocity analysis are the most computationally intensive parts of seismic processing. As a results researchers are always trying to find ways to speedup these processes \cite[]{bednar,Stork}.  One approach used to speed up downward continuation based algorithms is to recognize that the earth attenuates seismic signals.  As a result, as we push the wave-field down in depth, we can ignore higher and higher frequencies and still obtain an accurate image\cite[]{Clapp.sep.111.bob3}.  This approach lowers the cost as you increase in depth. This technique is well suited for downward continuation based approaches which are done frequency by frequency.  Reducing the frequencies downward continued as a function of depth  is particularly effective in combination with recognizing that there was no reason to propagate waves a large distance from the source at early times.  While following the wavefield is used routinely in RTM,  taking advantage of attenuation is not commonly used.  Reasons include: the cost of propagation with an attenuated wave equation, attenuation is a function of medium parameter, and propagation is generally done in the the time, rather frequency domain.
+
+In this paper I use a constant-Q approximation based on the work of \cite[]{zhu}.  As I propagate my source I resample my medium based on the maximum frequency that has not been significantly attenuated. Combining this approach with following the wave-field, I show that I can achieve significant computational speedups.
+
+\section{Method and Theory}
+
+\subsection{Modeling}
+
+Explicit finite difference modeling is constrained by figuring  out a sampling in time and space that results in stable propagation and does not create dispersive events.  For stability the Courant-Friedrichs-Lewy condition \cite[]{courant1967partial} must be met.  Stability is a function of limiting what percentage of a grid cell energy can move in one time step. Stability is therefore a function of the maximum velocity $v_{max}$, the minimum spatial sampling $d_{min}$, and the time step $dt$. For stability,
+
+\begin{equation}
+v_{max}\frac{dt}{d_{min}} < .5 \label{eq:stability}.
+\end{equation}
+
+The stability condition pushes one to use larger spatial sampling (faster, but less resolution) and/or finer time sampling (more expensive).  Dispersion, on the other hand, is a function of the minimum velocity $v_{min}$, the maximum frequency $f_{max}$, and the maximum spaital sampling $d_{max}$.   To avoid grid dispersion we need to  sample a given frequency with a minimum number of points.  There isn't a consensus on the minimum number
+of points. For the purpose of this paper I will require  3.2  points therefore,
+
+\begin{equation}
+\frac{v_{min} }{f_{max}d_{max}} > 3.2 \label{eq:dispersion}.
+\end{equation}
+
+The dispersion constraint pushes us towards smaller (more expensive) spatial sampling, because of the stability constraint, and results in smaller the steps.  Minimizing dispersion is the real reason for the expense of finite differences.  To avoid grid dispersion and achieve the same level of stability the number of operations increase by the fourth power (three due to space sampling and one for time).
+
+From observation we know that the earth attenuates acoustic signals.  Attenuation varies as a function of frequency and earth materials. The first approximation I am going to use is the concept of the constant Q model introduced by \cite{Kjartansson.sep.23}.  Q is defined as
+
+\begin{equation}
+Q=2 \pi \left( \frac{E}{\partial E}\right),
+\end{equation}
+
+where $\frac{E}{\partial E}$ is the fraction of energy lost per cycle. The larger the $Q$ value, the less energy loss per cycles.  The constant Q assumption assumes that energy dies out is a function of the number of wavelengths traveled through a medium. The higher the frequency, the faster the energy is attenuated.
+
+\subsection{Constant Q formulation}
+
+\section{Examples (Optional)}
+
+This is the first sentence of the example section.
+
+\section{Results (Optional)}
+
+This is the first sentence of the result section.
+
+% \begin{figure}[!htb]
+%   \centering
+%   \includegraphics[width=0.6\textwidth]{....eps}
+%   \caption{...}
+% \end{figure}
+
+\section{Conclusions}
+
+This is the first sentence of the conclusions.
+
+\section{Acknowledgements (Optional)}
+
+This is the first sentence of the acknowledgements.
+
+
+\bibliography{bob}
+
+
+\end{document}
+
