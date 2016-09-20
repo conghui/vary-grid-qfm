@@ -1,4 +1,5 @@
 \documentclass{paris17}
+\usepackage{amsmath}
 \begin{document}
 
 \section{Introduction}
@@ -35,6 +36,37 @@ Q=2 \pi \left( \frac{E}{\partial E}\right),
 where $\frac{E}{\partial E}$ is the fraction of energy lost per cycle. The larger the $Q$ value, the less energy loss per cycles.  The constant Q assumption assumes that energy dies out is a function of the number of wavelengths traveled through a medium. The higher the frequency, the faster the energy is attenuated.
 
 \subsection{Constant Q formulation}
+
+Our theory is built on the foundation of \cite[]{zhu2014theory}. It is a time-domain differential equation for modelling seismic wave propagation in constant-Q viscoelastic media based on fractional spatial derivatives, specifically Laplacian differential operators of fractional order.  The stress–strain relation is derived from the classical equation expressed in terms of fractional time derivatives. The formulation has the advantage of not requiring additional field variables that increase the computer time and storage significantly \cite[]{zhu2014theory}.
+
+We first extend the formulation of \cite[]{zhu2014theory} from the 2D viscoelastic case to the 3D viscoelastic case. Note that the Laplacian differential operators of fractional order bring extra computational costs to the elastic modeling, we approximate it with the conventional Laplacian operators, which significantly reduces the computing complexities. Also, we further reduce the computational costs by ignoring the dispersion terms because it make little effects compared to the attenuation of the signals. As a result, our equation is then
+
+\begin{equation}
+\begin{bmatrix} \sigma_{11}\\ \sigma_{22}\\ \sigma_{33} \end{bmatrix} = \begin{bmatrix} \frac{\partial \tau_p^{(1)}}{\partial t} + c_{11} & \frac{\partial \tau_p^{(1)}}{\partial t} - 2\frac{\partial \tau_s^{(1)}}{\partial t} +c_{12}& \frac{\partial \tau_p^{(1)}}{\partial t} - 2\frac{\partial \tau_s^{(1)}}{\partial t} +c_{13} \\ \frac{\partial \tau_p^{(2)}}{\partial t} - 2\frac{\partial \tau_s^{(2)}}{\partial t} +c_{12}& \frac{\partial \tau_p^{(2)}}{\partial t} + c_{22} & \frac{\partial \tau_p^{(2)}}{\partial t} - 2\frac{\partial \tau_s^{(2)}}{\partial t} +c_{23}\\ \frac{\partial \tau_p^{(3)}}{\partial t} - 2\frac{\partial \tau_s^{(3)}}{\partial t} +c_{13} & \frac{\partial \tau_p^{(3)}}{\partial t} - 2\frac{\partial \tau_s^{(3)}}{\partial t} +c_{23} & \frac{\partial \tau_p^{(3)}}{\partial t} + c_{33} \end{bmatrix} \begin{bmatrix} \epsilon_{11}\\ \epsilon_{22}\\ \epsilon_{33} \end{bmatrix}
+\end{equation}
+
+\begin{equation}
+  \sigma_{12} = \left ( 2\frac{\partial \frac{c_{11}-c_{12}}{2}c_s^{(2\gamma-1)}\sin(\pi\gamma_s)}{\partial t} + c_{66} \right )\times \epsilon_{12}
+\end{equation}
+%\begin{equation}
+%\begin{bmatrix}
+%\sigma_{11}\\
+%\sigma_{22}\\
+%\sigma_{33}
+%\end{bmatrix} =
+%\begin{bmatrix}
+%\frac{\partial \tau_p^{(1)}}{\partial t} + c_{11} & \frac{\partial \tau_p^{(1)}}{\partial t} - 2\frac{\partial \tau_s^{(1)}}{\partial t} +c_{12}& \frac{\partial \tau_p^{(1)}}{\partial t} - 2\frac{\partial \tau_s^{(1)}}{\partial t} +c_{13} \\
+  %\frac{\partial \tau_p^{(2)}}{\partial t} - 2\frac{\partial \tau_s^{(2)}}{\partial t} +c_{12}& \frac{\partial \tau_p^{(2)}}{\partial t} + c_{22} & \frac{\partial \tau_p^{(2)}}{\partial t} - 2\frac{\partial \tau_s^{(2)}}{\partial t} +c_{23}\\
+  %\frac{\partial \tau_p^{(3)}}{\partial t} - 2\frac{\partial \tau_s^{(3)}}{\partial t} +c_{13} &  \frac{\partial \tau_p^{(3)}}{\partial t} - 2\frac{\partial \tau_s^{(3)}}{\partial t} +c_{23}  & \frac{\partial \tau_p^{(3)}}{\partial t} + c_{33}
+%\end{bmatrix} \begin{bmatrix}
+%\epsilon_{11}\\
+%\epsilon_{22}\\
+%\epsilon_{33}
+%\end{bmatrix}
+  %\label{eq:q_approximation}
+%\end{equation}
+
+The spatial derivatives are calculated with a generalization of the Fourier pseudospectral method to the fractional-derivative case. The accuracy of the numerical solution is verified against an analytical solution in a homogeneous medium. An example shows that the proposed wave equation describes the constant-Q attenuation and velocity dispersion behaviour observed in Pierre Shale. Finally, we consider a plane-layer model and the Marmousi model to show how the new formulation applies to inhomogeneous media.
 
 \section{Examples (Optional)}
 
