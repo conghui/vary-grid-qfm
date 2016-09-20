@@ -37,36 +37,45 @@ where $\frac{E}{\partial E}$ is the fraction of energy lost per cycle. The large
 
 \subsection{Constant Q formulation}
 
-Our theory is built on the foundation of \cite[]{zhu2014theory}. It is a time-domain differential equation for modelling seismic wave propagation in constant-Q viscoelastic media based on fractional spatial derivatives, specifically Laplacian differential operators of fractional order.  The stress–strain relation is derived from the classical equation expressed in terms of fractional time derivatives. The formulation has the advantage of not requiring additional field variables that increase the computer time and storage significantly \cite[]{zhu2014theory}.
+Our theory is built on the foundation of \cite[]{zhu2014theory}. It is a time-domain differential equation for modeling seismic wave propagation in constant-Q viscoelastic media based on fractional spatial derivatives, specifically Laplacian differential operators of fractional order.  The stress–strain relation is derived from the classical equation expressed in terms of fractional time derivatives. The formulation has the advantage of not requiring additional field variables that increase the computer time and storage significantly \cite[]{zhu2014theory}.
 
-We first extend the formulation of \cite[]{zhu2014theory} from the 2D viscoelastic case to the 3D viscoelastic case. Note that the Laplacian differential operators of fractional order bring extra computational costs to the elastic modeling, we approximate it with the conventional Laplacian operators, which significantly reduces the computing complexities. Also, we further reduce the computational costs by ignoring the dispersion terms because it make little effects compared to the attenuation of the signals. As a result, our equation is then
+We first extend the formulation of \cite[]{zhu2014theory} from the 2D viscoelastic case to the 3D viscoelastic case. Note that the Laplacian differential operators of fractional order bring extra computational costs to the elastic modeling, we approximate it with the conventional Laplacian operators, which significantly reduces the computing complexities. Also, we further reduce the computational costs by ignoring the dispersion terms because it make little effects compared to the attenuation of the signals. As a result, our equations are then
 
 \begin{equation}
 \begin{bmatrix} \sigma_{11}\\ \sigma_{22}\\ \sigma_{33} \end{bmatrix} = \begin{bmatrix} \frac{\partial \tau_p^{(1)}}{\partial t} + c_{11} & \frac{\partial \tau_p^{(1)}}{\partial t} - 2\frac{\partial \tau_s^{(1)}}{\partial t} +c_{12}& \frac{\partial \tau_p^{(1)}}{\partial t} - 2\frac{\partial \tau_s^{(1)}}{\partial t} +c_{13} \\ \frac{\partial \tau_p^{(2)}}{\partial t} - 2\frac{\partial \tau_s^{(2)}}{\partial t} +c_{12}& \frac{\partial \tau_p^{(2)}}{\partial t} + c_{22} & \frac{\partial \tau_p^{(2)}}{\partial t} - 2\frac{\partial \tau_s^{(2)}}{\partial t} +c_{23}\\ \frac{\partial \tau_p^{(3)}}{\partial t} - 2\frac{\partial \tau_s^{(3)}}{\partial t} +c_{13} & \frac{\partial \tau_p^{(3)}}{\partial t} - 2\frac{\partial \tau_s^{(3)}}{\partial t} +c_{23} & \frac{\partial \tau_p^{(3)}}{\partial t} + c_{33} \end{bmatrix} \begin{bmatrix} \epsilon_{11}\\ \epsilon_{22}\\ \epsilon_{33} \end{bmatrix}
 \end{equation}
 
 \begin{equation}
-  \sigma_{12} = \left ( 2\frac{\partial \frac{c_{11}-c_{12}}{2}c_s^{(2\gamma-1)}\sin(\pi\gamma_s)}{\partial t} + c_{66} \right )\times \epsilon_{12}
+  \sigma_{12} = \left ( 2\frac{\partial}{\partial t} \left( \frac{c_{11}-c_{12}}{2}c_s^{(2\gamma_s-1)}\sin(\pi\gamma_s) \right) + c_{66} \right )\times \epsilon_{12}
 \end{equation}
-%\begin{equation}
-%\begin{bmatrix}
-%\sigma_{11}\\
-%\sigma_{22}\\
-%\sigma_{33}
-%\end{bmatrix} =
-%\begin{bmatrix}
-%\frac{\partial \tau_p^{(1)}}{\partial t} + c_{11} & \frac{\partial \tau_p^{(1)}}{\partial t} - 2\frac{\partial \tau_s^{(1)}}{\partial t} +c_{12}& \frac{\partial \tau_p^{(1)}}{\partial t} - 2\frac{\partial \tau_s^{(1)}}{\partial t} +c_{13} \\
-  %\frac{\partial \tau_p^{(2)}}{\partial t} - 2\frac{\partial \tau_s^{(2)}}{\partial t} +c_{12}& \frac{\partial \tau_p^{(2)}}{\partial t} + c_{22} & \frac{\partial \tau_p^{(2)}}{\partial t} - 2\frac{\partial \tau_s^{(2)}}{\partial t} +c_{23}\\
-  %\frac{\partial \tau_p^{(3)}}{\partial t} - 2\frac{\partial \tau_s^{(3)}}{\partial t} +c_{13} &  \frac{\partial \tau_p^{(3)}}{\partial t} - 2\frac{\partial \tau_s^{(3)}}{\partial t} +c_{23}  & \frac{\partial \tau_p^{(3)}}{\partial t} + c_{33}
-%\end{bmatrix} \begin{bmatrix}
-%\epsilon_{11}\\
-%\epsilon_{22}\\
-%\epsilon_{33}
-%\end{bmatrix}
-  %\label{eq:q_approximation}
-%\end{equation}
 
-The spatial derivatives are calculated with a generalization of the Fourier pseudospectral method to the fractional-derivative case. The accuracy of the numerical solution is verified against an analytical solution in a homogeneous medium. An example shows that the proposed wave equation describes the constant-Q attenuation and velocity dispersion behaviour observed in Pierre Shale. Finally, we consider a plane-layer model and the Marmousi model to show how the new formulation applies to inhomogeneous media.
+\begin{equation}
+  \sigma_{13} = \left ( 2\frac{\partial}{\partial t} \left( \frac{c_{33}-c_{13}}{2}c_s^{(2\gamma_s-1)}\sin(\pi\gamma_s) \right) + c_{55} \right )\times \epsilon_{13}
+\end{equation}
+
+\begin{equation}
+  \sigma_{23} = \left ( 2\frac{\partial}{\partial t} \left( \frac{c_{22}-c_{23}}{2}c_s^{(2\gamma_s-1)}\sin(\pi\gamma_s) \right) + c_{44} \right )\times \epsilon_{23}
+\end{equation}
+
+\begin{equation}
+  \tau_p^{(1)} = c_{11}C_p^{2\gamma_p - 1}\sin(\pi \gamma_p)
+\end{equation}
+
+\begin{equation}
+  \tau_s^{(1)} = \frac{c_{11} - c_{13}}{2}C_s^{2\gamma_s - 1}\sin(\pi \gamma_s)
+\end{equation}
+
+\begin{equation}
+  \gamma_{p,s}=\frac{1}{\pi}\tan^{-1}(\frac{1}{Q_{p,s}})
+\end{equation}
+
+where $\sigma$ is the stress tensor; $\epsilon$ is the strain tensor; $c_{ij}$ is the forth-order stiffness tensor; $C_p$ and $C_s$ are the velocities of P-wave and S-wave. $Q_{p,s}$ is the constant factor for the attenuation of P-wave and S-wave respectively. Note that we only present how $\tau_p^{(1)}$ and $\tau_s^{(1)}$ are derived, $\tau_p^{(2)}$,$\tau_p^{(3)}$, $\tau_s^{(2)}$ and $\tau_s^{(3)}$ can be derived in a similar way.
+
+Our constant Q formulation is relatively computationally economic because we preserve the original workflow of elastic modeling while adding a few terms in the calculation of stress tensors from train tensors.
+
+\subsection{GPU optimizations}
+
+
 
 \section{Examples (Optional)}
 
