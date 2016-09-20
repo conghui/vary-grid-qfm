@@ -77,6 +77,18 @@ Our constant Q formulation is relatively computationally economic because we pre
 
 
 
+
+\section{Experiments}
+
+Figure xxx shows the wave-field using the standard acoustic wave equation (left) and an attenuation wave-field (right). Note the difference in the frequency content. This is can be more clearly seen in Figure xxx which shows the spectrum of wave-field at 0.9 seconds with $Q_p = Q_s = 20$. Notice the energy decay of frequency over time. The key observation is that there is no reason to worry about dispersion at frequencies that have attenuated. Specifically, I redo my dispersion calculation (equation 2) several times while propagating a wave-field. At each time block I use a fmax based on frequencies whose energy has not been reduced more than some percentage (in this paper 96\%). As a result, as I forward propagate in time my grid cells, and if I desire, time sampling, get larger. Figure 3 shows the speedup factor (defined as the number of grid cells times time steps) as a function of propagation time for different Q values. The longer the time record, the more using Q pays off in terms speed up. Using this approach the early time steps dominate the computation. For example assuming an initial maximum frequency of 90Hz and a constant velocity of 2000m/s, a Q value of 200, the total speedup is 4 even though most of the propagation time shows significantly more speedup. Figure 4 shows the speedups for Q values ranging from 150 to 350.
+
+Another speedup trick used by many when doing modeling/migration is to recognize that there is no need to propagate the wave-fields significantly away from the source at early times. The number of cells we need to propagate increases as a power of three (expanding wave-field) in modeling, and somewhat less in migration due to the spatial extent of our receivers. This speedup trick is most effective at early times and useless at late times when energy has propagated throughout the model, the opposite behavior as the constant-Q trick. Combining the two tricks is where we begin to see big payoffs. The left plot of Figure 6 shows the result of combining the two approaches for different values of Q.
+
+Table xxx shows the performance speedup on using different number of GPUs. Through combining the GPU optimization schemes above, the GPU design amoung four K40 cards improve the performance by upto xxx times over xxx cores. Note that the CPU design is also tuned by using multi-threading and vectorizations.
+
+
+The memory optimizations achieve the best usage of the hierarchical GPU spaces, while tuning the register usage per thread reaches a tradeoff to maximize the computing efficiency. Furthermore, the halo updating is largely hidden within the computations. So we achieve an inspiring performance speedup.
+
 \section{Examples (Optional)}
 
 This is the first sentence of the example section.
