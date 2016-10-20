@@ -75,7 +75,9 @@ Our constant Q formulation is relatively computationally economic because we pre
 
 \subsection{GPU optimizations}
 
+The reason why GPUs outperforms CPUs significantly on many scenarios is that the architecture of GPUs favors throughput of many data-parallel tasks over the latency of a single thread. We have an efficient parallel design on the GPU platform with three main strategies.
 
+Firstly, we fully utilize the different hierarchical memory of the GPU. We keep a set of constant variables such as the derivative coefficients in the constant memory and the read-only cache. As the 64KB first-level cache can be configured as different combinations between L1 cache and shared memory, we configure it dynamically based on different computing scenarios. For the stencil computation, we configure the first-level cache by setting the sizes of shared memory and L1 cache to be 48 KB and 16 KB, respectively, which achieves a high computation performance based on P. Micikevicius’ 3D stencil design. For others, we prefer to configure the first-level cache as L1 cache if we don't use memory explicitly.
 
 
 \section{Experiments}
