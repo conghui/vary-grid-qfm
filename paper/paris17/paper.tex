@@ -1,5 +1,17 @@
 \documentclass{paris17}
 \usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{floatrow}
+% Table float box with bottom caption, box width adjusted to content
+\newfloatcommand{capbtabbox}{table}[][\FBwidth]
+\usepackage{capt-of}% or \usepackage{caption}
+\usepackage{booktabs}
+\usepackage{varwidth}
+
+
 \begin{document}
 
 \section{Introduction}
@@ -12,28 +24,14 @@ In this paper I use a constant-Q approximation based on the work of \cite[]{zhu}
 
 \subsection{Modeling}
 
-Explicit finite difference modeling is constrained by figuring  out a sampling in time and space that results in stable propagation and does not create dispersive events.  For stability the Courant-Friedrichs-Lewy condition \cite[]{courant1967partial} must be met.  Stability is a function of limiting what percentage of a grid cell energy can move in one time step. Stability is therefore a function of the maximum velocity $v_{max}$, the minimum spatial sampling $d_{min}$, and the time step $dt$. For stability,
-
-\begin{equation}
-v_{max}\frac{dt}{d_{min}} < .5 \label{eq:stability}.
-\end{equation}
+Explicit finite difference modeling is constrained by figuring  out a sampling in time and space that results in stable propagation and does not create dispersive events.  For stability the Courant-Friedrichs-Lewy condition \cite[]{courant1967partial} must be met.  Stability is a function of limiting what percentage of a grid cell energy can move in one time step. Stability is therefore a function of the maximum velocity $v_{max}$, the minimum spatial sampling $d_{min}$, and the time step $dt$. For stability, we have $v_{max}\frac{dt}{d_{min}} < .5$.
 
 The stability condition pushes one to use larger spatial sampling (faster, but less resolution) and/or finer time sampling (more expensive).  Dispersion, on the other hand, is a function of the minimum velocity $v_{min}$, the maximum frequency $f_{max}$, and the maximum spaital sampling $d_{max}$.   To avoid grid dispersion we need to  sample a given frequency with a minimum number of points.  There isn't a consensus on the minimum number
-of points. For the purpose of this paper I will require  3.2  points therefore,
-
-\begin{equation}
-\frac{v_{min} }{f_{max}d_{max}} > 3.2 \label{eq:dispersion}.
-\end{equation}
+of points. For the purpose of this paper I will require  3.2  points therefore, we have $\frac{v_{min} }{f_{max}d_{max}} > 3.2 \label{eq:dispersion}$.
 
 The dispersion constraint pushes us towards smaller (more expensive) spatial sampling, because of the stability constraint, and results in smaller the steps.  Minimizing dispersion is the real reason for the expense of finite differences.  To avoid grid dispersion and achieve the same level of stability the number of operations increase by the fourth power (three due to space sampling and one for time).
 
-From observation we know that the earth attenuates acoustic signals.  Attenuation varies as a function of frequency and earth materials. The first approximation I am going to use is the concept of the constant Q model introduced by \cite{Kjartansson.sep.23}.  Q is defined as
-
-\begin{equation}
-Q=2 \pi \left( \frac{E}{\partial E}\right),
-\end{equation}
-
-where $\frac{E}{\partial E}$ is the fraction of energy lost per cycle. The larger the $Q$ value, the less energy loss per cycles.  The constant Q assumption assumes that energy dies out is a function of the number of wavelengths traveled through a medium. The higher the frequency, the faster the energy is attenuated.
+From observation we know that the earth attenuates acoustic signals.  Attenuation varies as a function of frequency and earth materials. The first approximation I am going to use is the concept of the constant Q model introduced by \cite{Kjartansson.sep.23}.  Q is defined as $Q=2 \pi \left( \frac{E}{\partial E}\right)$, where $\frac{E}{\partial E}$ is the fraction of energy lost per cycle. The larger the $Q$ value, the less energy loss per cycles.  The constant Q assumption assumes that energy dies out is a function of the number of wavelengths traveled through a medium. The higher the frequency, the faster the energy is attenuated.
 
 \subsection{Constant Q formulation}
 
@@ -77,41 +75,83 @@ Our constant Q formulation is relatively computationally economic because we pre
 
 The reason why GPUs outperforms CPUs significantly on many scenarios is that the architecture of GPUs favors throughput of many data-parallel tasks over the latency of a single thread. We have an efficient parallel design on the GPU platform with three main strategies.
 
-Firstly, we fully utilize the different hierarchical memory of the GPU. We keep a set of constant variables such as the derivative coefficients in the constant memory and the read-only cache. As the 64KB first-level cache can be configured as different combinations between L1 cache and shared memory, we configure it dynamically based on different computing scenarios. For the stencil computation, we configure the first-level cache by setting the sizes of shared memory and L1 cache to be 48 KB and 16 KB, respectively, which achieves a high computation performance based on P. Micikevicius’ 3D stencil design. For others, we prefer to configure the first-level cache as L1 cache if we don't use memory explicitly.
+Firstly, we fully utilize the different hierarchical memory of the GPU. We keep a set of constant variables such as the derivative coefficients in the constant memory and the read-only cache. As the 64KB first-level cache can be configured as different combinations between L1 cache and shared memory, we configure it dynamically based on different computing scenarios. For the stencil computation, we configure the first-level cache by setting the sizes of shared memory and L1 cache to be 48 KB and 16 KB, respectively, which achieves a high computation performance based on P. Micikevicius’ 3D stencil design. For others, we prefer to configure the first-level cache as L1 cache if we don't use shared memory explicitly.
 
+Secondly, we carefully tune the number of registers per thread to maximize the occupancy of GPUs. Since the access pattern of GPU global memory in the stencil kernel is irregular, the more threads are busy, the less latencies it is for memory access. However, as the number of registers is limited in a streaming multiprocessor (SM), increasing the number of registers per threads will decrease the number of active warps. So it is important to have a strategy to balance them. We first remove the intermediate variables to reduce the number of registers per threads. Then we dynamically tracking the performance by adjusting the block size and the \emph{maxrregcount} compiler option.
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \includegraphics[height=1.3in]{./fig/domain-decompose.pdf}
+        \caption{Domain decomposition}
+    \end{subfigure}%
+    ~ 
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \includegraphics[height=1.3in]{./fig/inner-outer.pdf}
+        \caption{Task decomposition}
+    \end{subfigure}
+    ~ 
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \includegraphics[height=1.1in]{./fig/overlap.pdf}
+        \caption{Comp. \& Comm. overlapping}
+    \end{subfigure}
+    \caption{Computation and communication overlapping over multiple GPUs.}
+\end{figure}
 
 \section{Experiments}
 
 Figure xxx shows the wave-field using the standard acoustic wave equation (left) and an attenuation wave-field (right). Note the difference in the frequency content. This is can be more clearly seen in Figure xxx which shows the spectrum of wave-field at 0.9 seconds with $Q_p = Q_s = 20$. Notice the energy decay of frequency over time. The key observation is that there is no reason to worry about dispersion at frequencies that have attenuated. Specifically, I redo my dispersion calculation (equation 2) several times while propagating a wave-field. At each time block I use a fmax based on frequencies whose energy has not been reduced more than some percentage (in this paper 96\%). As a result, as I forward propagate in time my grid cells, and if I desire, time sampling, get larger. Figure 3 shows the speedup factor (defined as the number of grid cells times time steps) as a function of propagation time for different Q values. The longer the time record, the more using Q pays off in terms speed up. Using this approach the early time steps dominate the computation. For example assuming an initial maximum frequency of 90Hz and a constant velocity of 2000m/s, a Q value of 200, the total speedup is 4 even though most of the propagation time shows significantly more speedup. Figure 4 shows the speedups for Q values ranging from 150 to 350.
 
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \includegraphics[height=1.3in]{./fig/std.pdf}
+        \caption{Wavefield without attenuation}
+    \end{subfigure}%
+    ~ 
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \includegraphics[height=1.3in]{./fig/q20.pdf}
+        \caption{Wavefield with attenuation}
+    \end{subfigure}
+    ~ 
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \includegraphics[height=1.3in]{./fig/spec.eps}
+        \caption{Spectrum of the wavefields}
+    \end{subfigure}
+    \caption{Wavefields with and without attenuation.}
+\end{figure}
+
 Another speedup trick used by many when doing modeling/migration is to recognize that there is no need to propagate the wave-fields significantly away from the source at early times. The number of cells we need to propagate increases as a power of three (expanding wave-field) in modeling, and somewhat less in migration due to the spatial extent of our receivers. This speedup trick is most effective at early times and useless at late times when energy has propagated throughout the model, the opposite behavior as the constant-Q trick. Combining the two tricks is where we begin to see big payoffs. The left plot of Figure 6 shows the result of combining the two approaches for different values of Q.
 
 Table xxx shows the performance speedup on using different number of GPUs. Through combining the GPU optimization schemes above, the GPU design amoung four K40 cards improve the performance by upto xxx times over xxx cores. Note that the CPU design is also tuned by using multi-threading and vectorizations.
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[b]{0.4\textwidth}
+        \centering
+        \includegraphics[height=1.5in]{./fig/speedup.eps}
+%        \caption{Wavefield without attenuation}
+    \end{subfigure}%
+    ~ 
+    \begin{subfigure}[b]{0.4\textwidth}
+        \centering
+        \includegraphics[height=1.5in]{./fig/speedup_q.eps}
+%        \caption{Wavefield with attenuation}
+    \end{subfigure}
+    \caption{Wavefields with and without attenuation.}
+\end{figure}
 
 
 The memory optimizations achieve the best usage of the hierarchical GPU spaces, while tuning the register usage per thread reaches a tradeoff to maximize the computing efficiency. Furthermore, the halo updating is largely hidden within the computations. So we achieve an inspiring performance speedup.
 
-\section{Examples (Optional)}
-
-This is the first sentence of the example section.
-
-\section{Results (Optional)}
-
-This is the first sentence of the result section.
-
-% \begin{figure}[!htb]
-%   \centering
-%   \includegraphics[width=0.6\textwidth]{....eps}
-%   \caption{...}
-% \end{figure}
-
 \section{Conclusions}
 
 This is the first sentence of the conclusions.
-
-\section{Acknowledgements (Optional)}
-
-This is the first sentence of the acknowledgements.
 
 
 \bibliography{bob}
