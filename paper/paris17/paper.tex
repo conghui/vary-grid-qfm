@@ -16,20 +16,35 @@
 
 \section{Introduction}
 
-Imaging and velocity analysis are the most computationally intensive parts of seismic processing. As a results researchers are always trying to find ways to speedup these processes \cite[]{bednar,Stork}.  One approach used to speed up downward continuation based algorithms is to recognize that the earth attenuates seismic signals.  As a result, as we push the wave-field down in depth, we can ignore higher and higher frequencies and still obtain an accurate image\cite[]{Clapp.sep.111.bob3}.  This approach lowers the cost as you increase in depth. This technique is well suited for downward continuation based approaches which are done frequency by frequency.  Reducing the frequencies downward continued as a function of depth  is particularly effective in combination with recognizing that there was no reason to propagate waves a large distance from the source at early times.  While following the wavefield is used routinely in RTM,  taking advantage of attenuation is not commonly used.  Reasons include: the cost of propagation with an attenuated wave equation, attenuation is a function of medium parameter, and propagation is generally done in the the time, rather frequency domain.
+Propagating wavefields using explicit finite difference method is the kernel of reverse time migration (RTM) and high-end velocity algorithms in seismic applications. In recent decades there has been a significant increase of interest in the seismic exploration community to reconstruct the image of the underground in larger regions and higher resolutions, especially in the elastic media. As a result the optimizing methods to improving the performance of the wavefield propagation are in great demands.
 
-In this paper I use a constant-Q approximation based on the work of \cite[]{zhu}.  As I propagate my source I resample my medium based on the maximum frequency that has not been significantly attenuated. Combining this approach with following the wave-field, I show that I can achieve significant computational speedups.
+
+
+%As the Earth attenuates the seismic signals in real Earth materials, an accuracy wavefield modeling approach needs to account for the effects of attenuation and velocity dispersion \cite[]{zhu2014theory}.
+
+One approach to improve the performance of modeling is to recognize that the earth attenuates seismic energies, in which case, we can ignore higher and higher frequencies and still obtain an accurate image\cite[]{Clapp.sep.111.bob3} when we push the wavefield down in depth. By using coarser sampling at large time steps,  the performance for downward continuation based approaches which are done frequency by frequency can be significantly improved.
+
+The concept of the constant Q model introduced by \cite{Kjartansson.sep.23} are used to approximate the attenuation. However, the formulation for computing the time derivative for the constant Q model proposed by Podlubny requires to store wavefields from previous values to present time \cite[]{podlubny1998fractional}, which is impractical for real seismic modeling in terms on memory capacities on modern computers. Zhu developed a constant-Q wave equation using fractional Laplacian operators to avoid the need of storing the past values of the wavefields \cite[]{zhu2014theory}. However, the proposed method is for 2D viscoelastic case and the computation of fractional Laplacian is expensive compared with the conventional FD methods.
+
+Meanwhile, the Nvidia Graphic Processing Units (GPUS)  have achieved great successes in many domains. In seismic application, GPUs are employed as high-performance computing accelerators for key seismic modeling, imaging and inversion kernels due to their high memory bandwidth and a large number of processing units \cite[]{ohmer2005implementation,he2015gpu}.
+
+This work proposes a high performance design of accelerating the wavefield propagation in 3D elastic media by approximating the constant Q propagation on multiple Nvidia GPUs. We first propose the Q approximation formulation by extending the formulation from the 2D viscoelastic to the 3D viscoelastic case where the fractional Laplacian is approximated to the conventional Laplacian and the dispersion term is ignored.  Optimization strategies from different aspects (memory, occupancy, and overlapping) are performed to form a high performance modeling kernel on multiple GPUs. To further improve the performance, a couple of tricks are also applied to reduce the total computation. Combining all the optimization schemes, we can achieve a significant speedup of the 3D elastic wave propagation by 60 to 200 times over a highly optimized 24-core CPU solution.
 
 \section{Method and Theory}
 
-\subsection{Modeling}
+%\subsection{Modeling}
 
-Explicit finite difference modeling is constrained by figuring  out a sampling in time and space that results in stable propagation and does not create dispersive events.  For stability the Courant-Friedrichs-Lewy condition \cite[]{courant1967partial} must be met.  Stability is a function of limiting what percentage of a grid cell energy can move in one time step. Stability is therefore a function of the maximum velocity $v_{max}$, the minimum spatial sampling $d_{min}$, and the time step $dt$. For stability, we have $v_{max}\frac{dt}{d_{min}} < .5$.  The stability condition pushes one to use larger spatial sampling (faster, but less resolution) and/or finer time sampling (more expensive).  Dispersion, on the other hand, is a function of the minimum velocity $v_{min}$, the maximum frequency $f_{max}$, and the maximum spaital sampling $d_{max}$.   To avoid grid dispersion we need to  sample a given frequency with a minimum number of points.  There isn't a consensus on the minimum number
-of points. For the purpose of this paper I will require  3.2  points therefore, we have $\frac{v_{min} }{f_{max}d_{max}} > 3.2 \label{eq:dispersion}$.
+%Explicit finite difference modeling is constrained by figuring  out a sampling in time and space that results in stable propagation and does not create dispersive events.  For stability the Courant-Friedrichs-Lewy condition \cite[]{courant1967partial} must be met.  For stability, we have $v_{max}\frac{dt}{d_{min}} < .5$, where  $v_{max}$ is the maximum velocity; $dt$ is the
 
-The dispersion constraint pushes us towards smaller (more expensive) spatial sampling, because of the stability constraint, and results in smaller the steps.  Minimizing dispersion is the real reason for the expense of finite differences.  To avoid grid dispersion and achieve the same level of stability the number of operations increase by the fourth power (three due to space sampling and one for time).
+%Stability is a function of limiting what percentage of a grid cell energy can move in one time step. Stability is therefore a function of the maximum velocity $v_{max}$, the minimum spatial sampling $d_{min}$, and the time step $dt$.
 
-From observation we know that the earth attenuates acoustic signals.  Attenuation varies as a function of frequency and earth materials. The first approximation I am going to use is the concept of the constant Q model introduced by \cite{Kjartansson.sep.23}.  Q is defined as $Q=2 \pi \left( \frac{E}{\partial E}\right)$, where $\frac{E}{\partial E}$ is the fraction of energy lost per cycle. The larger the $Q$ value, the less energy loss per cycles.  The constant Q assumption assumes that energy dies out is a function of the number of wavelengths traveled through a medium. The higher the frequency, the faster the energy is attenuated.
+
+%The stability condition pushes one to use larger spatial sampling (faster, but less resolution) and/or finer time sampling (more expensive).  Dispersion, on the other hand, is a function of the minimum velocity $v_{min}$, the maximum frequency $f_{max}$, and the maximum spaital sampling $d_{max}$.   To avoid grid dispersion we need to  sample a given frequency with a minimum number of points.  There isn't a consensus on the minimum number
+%of points. For the purpose of this paper I will require  3.2  points therefore, we have $\frac{v_{min} }{f_{max}d_{max}} > 3.2 \label{eq:dispersion}$.
+
+%The dispersion constraint pushes us towards smaller (more expensive) spatial sampling, because of the stability constraint, and results in smaller the steps.  Minimizing dispersion is the real reason for the expense of finite differences.  To avoid grid dispersion and achieve the same level of stability the number of operations increase by the fourth power (three due to space sampling and one for time).
+
+%Attenuation varies as a function of frequency and earth materials. The first approximation I am going to use is the concept of the constant Q model introduced by \cite{Kjartansson.sep.23}.  Q is defined as $Q=2 \pi \left( \frac{E}{\partial E}\right)$, where $\frac{E}{\partial E}$ is the fraction of energy lost per cycle. The larger the $Q$ value, the less energy loss per cycles.  The constant Q assumption assumes that energy dies out is a function of the number of wavelengths traveled through a medium. The higher the frequency, the faster the energy is attenuated.
 
 \subsection{Constant Q formulation}
 
@@ -67,9 +82,9 @@ We first extend the formulation of \cite[]{zhu2014theory} from the 2D viscoelast
 
 where $\sigma$ is the stress tensor; $\epsilon$ is the strain tensor; $c_{ij}$ is the forth-order stiffness tensor; $C_p$ and $C_s$ are the velocities of P-wave and S-wave. $Q_{p,s}$ is the constant factor for the attenuation of P-wave and S-wave respectively. Note that we only present how $\tau_p^{(1)}$ and $\tau_s^{(1)}$ are derived, $\tau_p^{(2)}$,$\tau_p^{(3)}$, $\tau_s^{(2)}$ and $\tau_s^{(3)}$ can be derived in a similar way.
 
-Our constant Q formulation is relatively computationally economic because we preserve the original workflow of elastic modeling while adding a few terms in the calculation of stress tensors from train tensors.
+The reason why our constant Q formulation is relatively computationally economic are: (1) The fractional Laplacian is approximated to the conventional Laplacian. (2) The dispersion term is ignored. (3) We preserve the original workflow of elastic modeling while only adding a few terms in the calculation of stress tensors from train tensors.
 
-\subsection{GPU optimizations}
+\subsection{GPU Optimizations}
 
 The reason why GPUs outperforms CPUs significantly on many scenarios is that the architecture of GPUs favors throughput of many data-parallel tasks over the latency of a single thread. We have an efficient parallel design on the GPU platform with three main strategies.
 
@@ -104,59 +119,67 @@ Thirdly, we design a computation and communication overlapping scheme to maximiz
     \caption{Computation and communication overlapping over multiple GPUs.}
 \end{figure}
 
+\subsection{Other Optimization Tricks}
+
+Apart from the GPU-based optimization, we also apply another two approaches to further improve the performance.  After we taking the energy attenuation into consideration, we can ignore the frequencies that have attenuated. As a result, the grid cells and the time steps get larger as the wavefield propagate in time. We can achieve significant speedup when we resample the velocities and wavefields to coarser grids, especially recording the longer time step. Using the above approach, the early time steps dominate the computation. We eliminate the bottleneck by applying another trick that we recognize that it is not necessary to propagate the wavefields significantly away from the source at early times. We eliminate the update of the wavefields where the waves have not reached so far.
+
+
+
 \section{Experiments}
 
-Figure xxx shows the wave-field using the standard acoustic wave equation (left) and an attenuation wave-field (right). Note the difference in the frequency content. This is can be more clearly seen in Figure xxx which shows the spectrum of wave-field at 0.9 seconds with $Q_p = Q_s = 20$.
-
-Notice the energy decay of frequency over time. The key observation is that there is no reason to worry about dispersion at frequencies that have attenuated. Specifically, I redo my dispersion calculation (equation 2) several times while propagating a wave-field. At each time block I use a fmax based on frequencies whose energy has not been reduced more than some percentage (in this paper 96\%). As a result, as I forward propagate in time my grid cells, and if I desire, time sampling, get larger. Figure 3 shows the speedup factor (defined as the number of grid cells times time steps) as a function of propagation time for different Q values. The longer the time record, the more using Q pays off in terms speed up. Using this approach the early time steps dominate the computation. For example assuming an initial maximum frequency of 90Hz and a constant velocity of 2000m/s, a Q value of 200, the total speedup is 4 even though most of the propagation time shows significantly more speedup. Figure 4 shows the speedups for Q values ranging from 150 to 350.
+\subsection{Q Effects}
+Experiments for demonstrating the functionality of applying the Q effects as well as  the performance with different optimization tricks are carried out in this paper. Figure \ref{fig:with-attenuation} shows a slice of the z-component of the 3D wavefield using standard elastic wave equation at time 0.9 seconds while the Figure \ref{fig:without-attenuation} shows the wavefields with the constant Q effect ($Q_s=Q_p=20$) added. The wave front in Figure \ref{fig:with-attenuation} is weaker. The spectrum of the wavefields gives a better illustration, which is shown in Figure \ref{fig:spectrum}.
 
 \begin{figure}[h]
     \centering
     \begin{subfigure}[b]{0.3\textwidth}
         \centering
-        \includegraphics[height=1.3in]{./fig/std.pdf}
-        \caption{Wavefield without attenuation}
-    \end{subfigure}%
+        \includegraphics[height=1.3in]{./fig/q20.pdf}
+        \caption{Wavefield with attenuation}
+        \label{fig:with-attenuation}
+    \end{subfigure}
     ~
     \begin{subfigure}[b]{0.3\textwidth}
         \centering
-        \includegraphics[height=1.3in]{./fig/q20.pdf}
-        \caption{Wavefield with attenuation}
-    \end{subfigure}
+        \includegraphics[height=1.3in]{./fig/std.pdf}
+        \caption{Wavefield without attenuation}
+        \label{fig:without-attenuation}
+    \end{subfigure}%
     ~
     \begin{subfigure}[b]{0.3\textwidth}
         \centering
         \includegraphics[height=1.3in]{./fig/spec.eps}
         \caption{Spectrum of the wavefields}
+        \label{fig:spectrum}
     \end{subfigure}
     \caption{Wavefields with and without attenuation.}
 \end{figure}
 
-Another speedup trick used by many when doing modeling/migration is to recognize that there is no need to propagate the wave-fields significantly away from the source at early times. The number of cells we need to propagate increases as a power of three (expanding wave-field) in modeling, and somewhat less in migration due to the spatial extent of our receivers. This speedup trick is most effective at early times and useless at late times when energy has propagated throughout the model, the opposite behavior as the constant-Q trick. Combining the two tricks is where we begin to see big payoffs. The left plot of Figure 6 shows the result of combining the two approaches for different values of Q.
+\subsection{Performance}
 
-Table xxx shows the performance speedup on using different number of GPUs. Through combining the GPU optimization schemes above, the GPU design amoung four K40 cards improve the performance by upto xxx times over xxx cores. Note that the CPU design is also tuned by using multi-threading and vectorizations.
+We propagate the wavefield in the 3D domain of size $700\times700\times700$ for 6000 time steps to measure the performance. Figure \ref{fig:gpu-speedup} shows the performance speedup of 1-4 K40 GPUs over one 24-core CPU node. The GPU design among 4 K40 accelerator cards can improve the performance of the computational part by up to 96 times, and improve the overall performance by up to 63 times. Note that the CPU design is also tuned by using multi-threading and vectorization. Figure \ref{fig:q-speedup} shows the speedup factor, which is  defined as the number of grid cells times time steps, as a function of propagation time for different Q values. We can see that the longer the time records, we more significant performance speedup we achieve.  Combing the two tricks as well as the GPU-based optimizations, we can achieve a performance speedup over 60 to 200 times as a function of Q.
+
 \begin{figure}[h]
     \centering
     \begin{subfigure}[b]{0.4\textwidth}
         \centering
         \includegraphics[height=1.5in]{./fig/speedup.eps}
-%        \caption{Wavefield without attenuation}
+        \caption{Speedup with GPU optimizations}
+        \label{fig:gpu-speedup}
     \end{subfigure}%
     ~
     \begin{subfigure}[b]{0.4\textwidth}
         \centering
         \includegraphics[height=1.5in]{./fig/speedup_q.eps}
-%        \caption{Wavefield with attenuation}
+        \caption{Speedup of different Q value}
+        \label{fig:q-speedup}
     \end{subfigure}
-    \caption{Wavefields with and without attenuation.}
+    \caption{Performance speedup}
 \end{figure}
-
-
-The memory optimizations achieve the best usage of the hierarchical GPU spaces, while tuning the register usage per thread reaches a tradeoff to maximize the computing efficiency. Furthermore, the halo updating is largely hidden within the computations. So we achieve an inspiring performance speedup.
 
 \section{Conclusions}
 
-This is the first sentence of the conclusions.
+This work manages to boost the performance the wave propagation in 3D elastic scenarios by approximating the Q propagation and using GPU platforms. We first extends the constant-Q formulation from the 2D viscoelastic to 3D viscoelastic case. Different optimization techniques on GPUs are then described for a high performance modeling kernel. We also propose a set of tricks to reduce the computation to further reduce computations. The experimental results show that we can achieve significant performance speedup by 60 to 200 times over the CPU-based solution.
 
 
 \bibliography{bob}
